@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@dzaroza/database";
-import { requireTenantContext, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
 
 function startOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`; }
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    await requireTenantContext(organizationId);
+    await requireFinanceRead(organizationId);
     const now = new Date();
     const currentMonth = startOfMonth(now);
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
