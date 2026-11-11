@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@dzaroza/database";
-import { requireTenantContext, toHttpError } from "@/lib/tenant";
+import { requireTenantRole, toHttpError } from "@/lib/tenant";
+import { MembershipRole } from "@dzaroza/database";
 import { ForbiddenError } from "@/lib/errors";
 
 export async function GET(_request: Request, context: { params: Promise<{ organizationId: string }> }) {
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) throw new ForbiddenError();
-    const membership = await requireTenantContext(organizationId);
+    const membership = await requireTenantRole(organizationId, [
+      MembershipRole.OWNER,
+      MembershipRole.ADMIN,
+      MembershipRole.FINANCE,
+      MembershipRole.PROJECT_MANAGER,
+      MembershipRole.SALES,
+    ]);
     const [clients, leads, projects, openInvoices] = await Promise.all([
       prisma.client.count({ where: { organizationId } }),
       prisma.lead.count({ where: { organizationId } }),
