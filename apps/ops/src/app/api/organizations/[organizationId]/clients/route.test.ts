@@ -38,7 +38,7 @@ describe("organization clients API tenant boundary", () => {
   });
 
   it("lists clients only after tenant authorization and scopes the query", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "STAFF" });
     prisma.client.findMany.mockResolvedValue([{ id: "client-a", organizationId: "org-a" }]);
     const response = await GET(new Request("http://localhost/api/organizations/org-a/clients") as never, context);
     expect(response.status).toBe(200);
