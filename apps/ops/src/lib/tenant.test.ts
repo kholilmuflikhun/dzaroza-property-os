@@ -43,7 +43,7 @@ describe("tenant authorization boundary", () => {
     });
     expect(prisma.membership.findUnique).toHaveBeenCalledWith({
       where: { organizationId_userId: { organizationId: "org-a", userId: "user-a" } },
-      select: { organizationId: true, userId: true, role: true },
+      select: { id: true, organizationId: true, userId: true, role: true },
     });
   });
 
