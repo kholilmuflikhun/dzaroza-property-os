@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedInvoiceWhere, authorizedPaymentWhere } from "@/lib/finance-access-query";
 
 const itemSchema = z.object({
   description: z.string().trim().min(2).max(500),
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    await requireFinanceRead(organizationId);
+    const actor = await requireFinanceRead(organizationId);
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? 50);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return NextResponse.json({ error: "Limit harus antara 1 dan 100." }, { status: 400 });
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
     const cursor = url.searchParams.get("cursor");
     if (cursor && cursor.length > 64) return NextResponse.json({ error: "Cursor tidak valid." }, { status: 400 });
     const rows = await prisma.invoice.findMany({
-      where: { organizationId, ...(status ? { status } : {}) },
+      where: { ...authorizedInvoiceWhere(actor), ...(status ? { status } : {}) },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         project: { select: { id: true, code: true, name: true, client: { select: { id: true, name: true } } } },
