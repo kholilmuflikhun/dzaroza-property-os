@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, ProjectStatus, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedProjectWhere } from "@/lib/project-access-query";
 
 const patchSchema = z.object({
   clientId: z.string().trim().min(1).max(64).optional(),
@@ -54,9 +55,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
   try {
     const { organizationId, projectId } = await context.params;
     if (!validIds(organizationId, projectId)) return NextResponse.json({ error: "ID organisasi atau proyek tidak valid." }, { status: 400 });
-    await requireTenantContext(organizationId);
+    const actor = await requireTenantContext(organizationId);
     const project = await prisma.project.findFirst({
-      where: { organizationId, id: projectId },
+      where: { ...authorizedProjectWhere(actor), id: projectId },
       include: { client: { select: { id: true, name: true, email: true, phone: true } } },
     });
     if (!project) return NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
@@ -71,7 +72,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
   try {
     const { organizationId, projectId } = await context.params;
     if (!validIds(organizationId, projectId)) return NextResponse.json({ error: "ID organisasi atau proyek tidak valid." }, { status: 400 });
-    const actor = await requireTenantRole(organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.PROJECT_MANAGER]);
+    const actor = await requireTenantContext(organizationId);
+    if (![MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.PROJECT_MANAGER].includes(actor.role)) {
+      return NextResponse.json({ error: "Akses perubahan proyek tidak diizinkan." }, { status: 403 });
+    }
     let body: unknown;
     try {
       body = await readJson(request);
@@ -85,6 +89,19 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
     const result = await prisma.$transaction(async (tx) => {
       const current = await tx.project.findFirst({ where: { organizationId, id: projectId } });
       if (!current) return { kind: "not-found" as const };
+      if (actor.role === MembershipRole.PROJECT_MANAGER) {
+        const assignment = await tx.projectAssignment.findFirst({
+          where: {
+            organizationId,
+            projectId,
+            membershipId: actor.id,
+            assignmentRole: "PROJECT_MANAGER",
+            status: "ACTIVE",
+          },
+          select: { id: true },
+        });
+        if (!assignment) return { kind: "forbidden" as const };
+      }
       if (input.clientId) {
         const client = await tx.client.findUnique({ where: { organizationId_id: { organizationId, id: input.clientId } }, select: { id: true } });
         if (!client) return { kind: "client-not-found" as const };
@@ -124,6 +141,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     if (result.kind === "not-found") return NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
+    if (result.kind === "forbidden") return NextResponse.json({ error: "Project Manager hanya dapat mengubah proyek yang ditugaskan kepadanya." }, { status: 403 });
     if (result.kind === "client-not-found") return NextResponse.json({ error: "Klien tidak ditemukan pada organisasi ini." }, { status: 404 });
     if (result.kind === "invalid-dates") return NextResponse.json({ error: "Tanggal selesai tidak boleh lebih awal dari tanggal mulai." }, { status: 400 });
     return NextResponse.json({ project: result.project });
