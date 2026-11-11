@@ -73,7 +73,7 @@ describe("organization projects API tenant boundary and quotas", () => {
   });
 
   it("lists only projects belonging to the authorized organization", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "STAFF" });
     prisma.project.findMany.mockResolvedValue([{ id: "project-a", organizationId: "org-a" }]);
     const response = await GET(new Request("http://localhost/api/organizations/org-a/projects") as never, context());
     expect(response.status).toBe(200);
