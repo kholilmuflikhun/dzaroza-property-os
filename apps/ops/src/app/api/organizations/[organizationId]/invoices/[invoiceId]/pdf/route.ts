@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@dzaroza/database";
-import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, toHttpError } from "@/lib/tenant";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 
 export const runtime = "nodejs";
