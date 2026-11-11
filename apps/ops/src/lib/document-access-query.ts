@@ -151,7 +151,7 @@ export async function canManageDocument(
     }
     return false;
   }
-  return ["STAFF", "FINANCE", "SALES", "PROJECT_MANAGER"].includes(actor.role)
+  return actor.role === "STAFF"
     && document.uploadedById === actor.userId
-    && ["READ", "FINALIZE", "DOWNLOAD"].includes(action);
+    && ["READ", "UPLOAD", "FINALIZE", "DOWNLOAD"].includes(action);
 }
