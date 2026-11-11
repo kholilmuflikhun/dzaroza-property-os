@@ -116,6 +116,7 @@ describe("tenant-scoped R2 presign API", () => {
   });
 
   it("derives the project link from a tenant-owned invoice", async () => {
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "FINANCE" });
     invoiceFindFirst.mockResolvedValue({ id: "invoice-a", projectId: "project-a", project: { clientId: "client-a" }, quotation: { clientId: "client-a" } });
     const response = await POST(request({
       action: "upload", fileName: "invoice.pdf", contentType: "application/pdf", size: 1024, invoiceId: "invoice-a",
@@ -134,6 +135,7 @@ describe("tenant-scoped R2 presign API", () => {
 
 
   it("rejects linking a project from another client to an unassigned invoice", async () => {
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "FINANCE" });
     invoiceFindFirst.mockResolvedValue({ id: "invoice-a", projectId: null, quotation: { clientId: "client-a" } });
     projectFindFirst
       .mockResolvedValueOnce({ id: "project-other-client" })
@@ -156,6 +158,7 @@ describe("tenant-scoped R2 presign API", () => {
   });
 
   it("rejects an invoice whose linked project belongs to a different client than its quotation", async () => {
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "FINANCE" });
     invoiceFindFirst.mockResolvedValue({
       id: "invoice-a", projectId: "project-a", project: { clientId: "client-b" }, quotation: { clientId: "client-a" },
     });
@@ -168,6 +171,7 @@ describe("tenant-scoped R2 presign API", () => {
   });
 
   it("rejects mismatched project and invoice associations", async () => {
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "FINANCE" });
     projectFindFirst.mockResolvedValue({ id: "project-a" });
     invoiceFindFirst.mockResolvedValue({ id: "invoice-a", projectId: "project-b", project: { clientId: "client-a" }, quotation: { clientId: "client-a" } });
     const response = await POST(request({
