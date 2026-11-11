@@ -103,6 +103,21 @@ describe("tenant-scoped R2 presign API", () => {
   });
 
 
+
+  it("denies unlinked uploads to Finance, Project Manager, Sales, and Client roles", async () => {
+    for (const role of ["FINANCE", "PROJECT_MANAGER", "SALES", "CLIENT"] as const) {
+      requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role });
+      createPresignedUploadUrl.mockClear();
+      create.mockClear();
+      const response = await POST(request({
+        action: "upload", fileName: "private.pdf", contentType: "application/pdf", size: 1024,
+      }), context);
+      expect(response.status).toBe(403);
+      expect(createPresignedUploadUrl).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    }
+  });
+
   it("rejects project and invoice links outside the active organization before signing", async () => {
     const response = await POST(request({
       action: "upload", fileName: "file.pdf", contentType: "application/pdf", size: 1024, projectId: "project-foreign",
