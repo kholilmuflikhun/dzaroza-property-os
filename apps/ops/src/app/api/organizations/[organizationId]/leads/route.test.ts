@@ -45,7 +45,7 @@ describe("organization CRM leads API", () => {
   });
 
   it("lists only leads belonging to the authorized organization", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
     prisma.lead.findMany.mockResolvedValue([{ id: "lead-a", organizationId: "org-a" }]);
     const response = await GET(getRequest(), context);
     expect(response.status).toBe(200);
@@ -56,7 +56,7 @@ describe("organization CRM leads API", () => {
   });
 
   it("filters by a validated pipeline stage and supports bounded page sizes", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
     prisma.lead.findMany.mockResolvedValue([]);
     const response = await GET(getRequest("?stage=QUALIFIED&limit=20"), context);
     expect(response.status).toBe(200);
@@ -67,7 +67,7 @@ describe("organization CRM leads API", () => {
   });
 
   it("uses a validated cursor for the next tenant-scoped page", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
     prisma.lead.findMany.mockResolvedValue([]);
     const response = await GET(getRequest("?limit=20&cursor=lead-cursor-a"), context);
     expect(response.status).toBe(200);
@@ -80,14 +80,14 @@ describe("organization CRM leads API", () => {
   });
 
   it("rejects invalid filters before querying", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const response = await GET(getRequest("?stage=UNKNOWN&limit=500"), context);
     expect(response.status).toBe(400);
     expect(prisma.lead.findMany).not.toHaveBeenCalled();
   });
 
   it("does not query leads when tenant authorization fails", async () => {
-    requireTenantContext.mockRejectedValue(Object.assign(new Error("Forbidden"), { name: "ForbiddenError" }));
+    requireTenantRole.mockRejectedValue(Object.assign(new Error("Forbidden"), { name: "ForbiddenError" }));
     const response = await GET(getRequest(), context);
     expect(response.status).toBe(403);
     expect(prisma.lead.findMany).not.toHaveBeenCalled();
