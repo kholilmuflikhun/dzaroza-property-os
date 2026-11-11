@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@dzaroza/database";
-import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, toHttpError } from "@/lib/tenant";
 
 function startOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`; }
