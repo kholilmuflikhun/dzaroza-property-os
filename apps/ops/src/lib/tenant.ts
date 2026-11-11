@@ -22,6 +22,15 @@ export async function requireTenantRole(organizationId: string, allowedRoles: Me
   if (!membershipHasAllowedRole(membership, allowedRoles)) throw new ForbiddenError();
   return membership;
 }
+
+export async function requireFinanceRead(organizationId: string) {
+  return requireTenantRole(organizationId, [
+    MembershipRole.OWNER,
+    MembershipRole.ADMIN,
+    MembershipRole.FINANCE,
+    MembershipRole.PROJECT_MANAGER,
+  ]);
+}
 export function toHttpError(error: unknown) {
   if (error instanceof UnauthorizedError) return { status: 401, message: error.message };
   if (error instanceof ForbiddenError) return { status: 403, message: error.message };
