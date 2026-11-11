@@ -64,7 +64,7 @@ describe("organization quotations API", () => {
   });
 
   it("rejects invalid status and page size", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const response = await GET(getRequest("?status=UNKNOWN&limit=500"), context);
     expect(response.status).toBe(400);
     expect(prisma.quotation.findMany).not.toHaveBeenCalled();
