@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedQuotationWhere } from "@/lib/quotation-access-query";
 
 const itemSchema = z.object({
   description: z.string().trim().min(2).max(500),
@@ -54,7 +55,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
     if (!organizationId || organizationId.length > 64) {
       return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    const actor = await requireTenantContext(organizationId);
+    if (actor.role === "STAFF" || actor.role === "CLIENT") {
+      return NextResponse.json({ error: "Akses quotation tidak diizinkan." }, { status: 403 });
+    }
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? 50);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
       return NextResponse.json({ error: "Cursor quotation tidak valid." }, { status: 400 });
     }
     const rows = await prisma.quotation.findMany({
-      where: { organizationId, ...(status ? { status } : {}) },
+      where: { ...authorizedQuotationWhere(actor), ...(status ? { status } : {}) },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         client: { select: { id: true, name: true } },
@@ -137,14 +141,34 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
     const number = `QT-${datePart}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
     const result = await prisma.$transaction(async (tx) => {
-      const client = await tx.client.findUnique({
-        where: { organizationId_id: { organizationId, id: input.clientId } },
+      const client = await tx.client.findFirst({
+        where: {
+          organizationId,
+          id: input.clientId,
+          ...(actor.role === "SALES" ? {
+            salesAccesses: { some: { organizationId, membershipId: actor.id, status: "ACTIVE" } },
+          } : {}),
+        },
         select: { id: true },
       });
       if (!client) return { kind: "client-not-found" as const };
+      if (actor.role === "PROJECT_MANAGER" && !input.projectId) {
+        return { kind: "project-not-found" as const };
+      }
       if (input.projectId) {
-        const project = await tx.project.findUnique({
-          where: { organizationId_id: { organizationId, id: input.projectId } },
+        const project = await tx.project.findFirst({
+          where: {
+            organizationId,
+            id: input.projectId,
+            ...(actor.role === "PROJECT_MANAGER" ? {
+              assignments: { some: {
+                organizationId,
+                membershipId: actor.id,
+                assignmentRole: "PROJECT_MANAGER",
+                status: "ACTIVE",
+              } },
+            } : {}),
+          },
           select: { id: true, clientId: true },
         });
         if (!project || project.clientId !== input.clientId) return { kind: "project-not-found" as const };
