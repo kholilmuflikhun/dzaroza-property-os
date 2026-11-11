@@ -50,17 +50,21 @@ describe("quotation detail API", () => {
   });
 
   it("returns a quotation scoped to the authorized organization", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a" });
+    requireTenantContext.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     prisma.quotation.findFirst.mockResolvedValue({ id: "quotation-a", organizationId: "org-a", items: [] });
     const response = await GET(getRequest(), context);
     expect(response.status).toBe(200);
     expect(prisma.quotation.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: { organizationId: "org-a", id: "quotation-a" },
+      where: {
+        organizationId: "org-a",
+        id: "quotation-a",
+        client: { salesAccesses: { some: { organizationId: "org-a", membershipId: "sales-member-a", status: "ACTIVE" } } },
+      },
     }));
   });
 
   it("sends a draft quotation and records an audit event atomically", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a" });
+    requireTenantRole.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const current = { id: "quotation-a", organizationId: "org-a", status: "DRAFT", number: "QT-1", total: new TestDecimal(100), items: [] };
     const sent = { ...current, status: "SENT", issuedAt: new Date(), client: null, project: null, items: [] };
     const tx = {
