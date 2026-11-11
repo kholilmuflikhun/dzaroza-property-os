@@ -41,8 +41,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma Client (no migration)
         run: pnpm db:generate
-      - name: Prepare isolated CI database
-        run: pnpm --filter @dzaroza/database exec prisma db push --schema prisma/schema.prisma --accept-data-loss
+      - name: Apply migration chain to isolated CI database
+        run: pnpm --filter @dzaroza/database exec prisma migrate deploy --schema prisma/schema.prisma
+      - name: Verify tenant-scoped relational constraints
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/prisma/tests/tenant-integrity.sql
       - name: OS TypeScript
         run: pnpm --filter @dzaroza/ops typecheck
       - name: OS unit tests
