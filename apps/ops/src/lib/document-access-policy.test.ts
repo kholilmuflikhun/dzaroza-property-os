@@ -31,6 +31,17 @@ describe("document access policy", () => {
     expect(canAccessDocument(base, "UPLOAD")).toBe(false);
     expect(canAccessDocument({ ...base, clientPortalAccess: false }, "READ")).toBe(false);
   });
+
+  it("restricts unlinked documents to Staff-owned files", () => {
+    const staff = { role: "STAFF" as const, userId: "staff-a", uploaderId: "staff-a", scope: "UNLINKED" as const };
+    expect(canAccessDocument(staff, "UPLOAD")).toBe(true);
+    expect(canAccessDocument(staff, "FINALIZE")).toBe(true);
+    expect(canAccessDocument({ ...staff, uploaderId: "staff-b" }, "READ")).toBe(false);
+    for (const role of ["FINANCE", "PROJECT_MANAGER", "SALES", "CLIENT"] as const) {
+      expect(canAccessDocument({ role, userId: "other", uploaderId: "other", scope: "UNLINKED" }, "READ")).toBe(false);
+      expect(canAccessDocument({ role, userId: "other", uploaderId: "other", scope: "UNLINKED" }, "UPLOAD")).toBe(false);
+    }
+  });
   it("denies invalid scopes and scopes assignment administration", () => {
     expect(canAccessDocument({ role: "STAFF", userId: "u", scope: "INVALID" }, "READ")).toBe(false);
     expect(canManageProjectAssignments("OWNER")).toBe(true);
