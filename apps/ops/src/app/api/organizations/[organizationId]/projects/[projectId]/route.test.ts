@@ -56,7 +56,7 @@ describe("organization project detail API", () => {
   });
 
   it("returns only a project in the authorized organization", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "STAFF" });
     prisma.project.findFirst.mockResolvedValue({ id: "project-a", organizationId: "org-a" });
     const response = await GET(new Request("http://localhost") as never, context);
     expect(response.status).toBe(200);
@@ -67,7 +67,7 @@ describe("organization project detail API", () => {
   });
 
   it("returns 404 for a project outside the tenant", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "member-a", organizationId: "org-a", userId: "user-a", role: "STAFF" });
     prisma.project.findFirst.mockResolvedValue(null);
     const response = await GET(new Request("http://localhost") as never, context);
     expect(response.status).toBe(404);
