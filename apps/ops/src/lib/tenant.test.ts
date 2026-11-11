@@ -7,7 +7,7 @@ const { prisma, getServerSession } = vi.hoisted(() => ({
 
 vi.mock("@dzaroza/database", () => ({
   prisma,
-  MembershipRole: { OWNER: "OWNER", ADMIN: "ADMIN", STAFF: "STAFF" },
+  MembershipRole: { OWNER: "OWNER", ADMIN: "ADMIN", PROJECT_MANAGER: "PROJECT_MANAGER", FINANCE: "FINANCE", SALES: "SALES", STAFF: "STAFF", CLIENT: "CLIENT" },
 }));
 vi.mock("next-auth", () => ({ getServerSession }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
@@ -16,6 +16,7 @@ import {
   requireUserId,
   requireTenantContext,
   requireTenantRole,
+  requireFinanceRead,
   toHttpError,
 } from "./tenant";
 import { ForbiddenError, UnauthorizedError } from "./errors";
@@ -73,6 +74,26 @@ describe("tenant authorization boundary", () => {
     expect(prisma.membership.findUnique).toHaveBeenCalledOnce();
   });
 
+
+  it("allows Finance and Project Manager read-only access to finance APIs", async () => {
+    for (const role of ["FINANCE", "PROJECT_MANAGER"] as const) {
+      getServerSession.mockResolvedValue({ user: { id: "user-a" } });
+      prisma.membership.findUnique.mockResolvedValue({
+        id: "member-a", organizationId: "org-a", userId: "user-a", role,
+      });
+      await expect(requireFinanceRead("org-a")).resolves.toMatchObject({ role });
+    }
+  });
+
+  it("denies Sales, Staff, and Client access to finance APIs", async () => {
+    for (const role of ["SALES", "STAFF", "CLIENT"] as const) {
+      getServerSession.mockResolvedValue({ user: { id: "user-a" } });
+      prisma.membership.findUnique.mockResolvedValue({
+        id: "member-a", organizationId: "org-a", userId: "user-a", role,
+      });
+      await expect(requireFinanceRead("org-a")).rejects.toBeInstanceOf(ForbiddenError);
+    }
+  });
   it("returns the verified membership for an allowed role", async () => {
     getServerSession.mockResolvedValue({ user: { id: "user-a" } });
     const membership = { organizationId: "org-a", userId: "user-a", role: "ADMIN" };
