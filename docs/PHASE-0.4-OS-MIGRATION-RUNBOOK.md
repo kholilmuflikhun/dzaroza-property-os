@@ -20,7 +20,7 @@ These PRs are not merged into legacy `main`. Importing this snapshot is a delibe
 
 ## Expected source paths
 
-- `apps/ops/` → target repository root.
+- `apps/ops/` → target `apps/ops/` (keep the pnpm workspace layout intact).
 - `packages/database/` → target `packages/database/`.
 - `packages/shared/` → target `packages/shared/`.
 - Root workspace configuration required by the OS app (including `package.json`, `pnpm-workspace.yaml`, `turbo.json`, and relevant TypeScript/config files) must be reviewed and imported selectively.
