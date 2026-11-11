@@ -4,7 +4,9 @@ type ProjectAccessActor = {
   role: string;
 };
 
-export function authorizedProjectWhere(actor: ProjectAccessActor) {
+import type { Prisma } from "@dzaroza/database";
+
+export function authorizedProjectWhere(actor: ProjectAccessActor): Prisma.ProjectWhereInput {
   const tenant = { organizationId: actor.organizationId };
   if (actor.role === "OWNER" || actor.role === "ADMIN" || actor.role === "FINANCE") {
     return tenant;
