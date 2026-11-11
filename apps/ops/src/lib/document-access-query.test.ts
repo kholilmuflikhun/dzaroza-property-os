@@ -91,7 +91,7 @@ describe("document action authorization", () => {
       project: { assignments: [], client: { salesAccesses: [{ id: "grant-a" }], portalAccesses: [] } },
     }));
     await expect(canManageDocument(actor("SALES"), "doc-a", "READ")).resolves.toBe(true);
-    await expect(canManageDocument(actor("SALES"), "doc-a", "DOWNLOAD")).resolves.toBe(false);
+    await expect(canManageDocument(actor("SALES"), "doc-a", "UPLOAD")).resolves.toBe(false);
   });
 
 
