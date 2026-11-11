@@ -4,7 +4,9 @@ type ClientAccessActor = {
   role: string;
 };
 
-export function authorizedClientWhere(actor: ClientAccessActor) {
+import type { Prisma } from "@dzaroza/database";
+
+export function authorizedClientWhere(actor: ClientAccessActor): Prisma.ClientWhereInput {
   const tenant = { organizationId: actor.organizationId };
   if (actor.role === "OWNER" || actor.role === "ADMIN" || actor.role === "FINANCE") {
     return tenant;
