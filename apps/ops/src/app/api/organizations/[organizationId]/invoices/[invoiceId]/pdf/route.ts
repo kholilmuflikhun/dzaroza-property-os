@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@dzaroza/database";
 import { requireFinanceRead, toHttpError } from "@/lib/tenant";
+import { authorizedInvoiceWhere } from "@/lib/finance-access-query";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 
 export const runtime = "nodejs";
@@ -11,11 +12,11 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
     if (!organizationId || organizationId.length > 64 || !invoiceId || invoiceId.length > 64) {
       return NextResponse.json({ error: "ID tidak valid." }, { status: 400 });
     }
-    await requireFinanceRead(organizationId);
+    const actor = await requireFinanceRead(organizationId);
     const [organization, invoice] = await Promise.all([
       prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true, currency: true } }),
       prisma.invoice.findFirst({
-        where: { organizationId, id: invoiceId },
+        where: { ...authorizedInvoiceWhere(actor), id: invoiceId },
         include: {
           items: { orderBy: { sortOrder: "asc" } },
           project: { include: { client: { select: { name: true } } } },
