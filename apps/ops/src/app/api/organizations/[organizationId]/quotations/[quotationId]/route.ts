@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedQuotationWhere } from "@/lib/quotation-access-query";
 
 const itemSchema = z.object({
   description: z.string().trim().min(2).max(500),
@@ -61,9 +62,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
     if (!validIds(organizationId, quotationId)) {
       return NextResponse.json({ error: "ID organisasi atau quotation tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    const actor = await requireTenantContext(organizationId);
+    if (actor.role === "STAFF" || actor.role === "CLIENT") {
+      return NextResponse.json({ error: "Akses quotation tidak diizinkan." }, { status: 403 });
+    }
     const quotation = await prisma.quotation.findFirst({
-      where: { organizationId, id: quotationId },
+      where: { ...authorizedQuotationWhere(actor), id: quotationId },
       include: {
         client: { select: { id: true, name: true, email: true, phone: true } },
         project: { select: { id: true, code: true, name: true, status: true } },
@@ -103,7 +107,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
 
     const result = await prisma.$transaction(async (tx) => {
       const current = await tx.quotation.findFirst({
-        where: { organizationId, id: quotationId },
+        where: { ...authorizedQuotationWhere(actor), id: quotationId },
         include: { items: { orderBy: { sortOrder: "asc" } } },
       });
       if (!current) return { kind: "not-found" as const };
@@ -119,14 +123,34 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
         const input = parsed.data;
         const clientId = input.clientId ?? current.clientId;
         const projectId = input.projectId === undefined ? current.projectId : input.projectId;
-        const client = await tx.client.findUnique({
-          where: { organizationId_id: { organizationId, id: clientId } },
+        const client = await tx.client.findFirst({
+          where: {
+            organizationId,
+            id: clientId,
+            ...(actor.role === "SALES" ? {
+              salesAccesses: { some: { organizationId, membershipId: actor.id, status: "ACTIVE" } },
+            } : {}),
+          },
           select: { id: true },
         });
         if (!client) return { kind: "client-not-found" as const };
+        if (actor.role === "PROJECT_MANAGER" && !projectId) {
+          return { kind: "project-not-found" as const };
+        }
         if (projectId) {
-          const project = await tx.project.findUnique({
-            where: { organizationId_id: { organizationId, id: projectId } },
+          const project = await tx.project.findFirst({
+            where: {
+              organizationId,
+              id: projectId,
+              ...(actor.role === "PROJECT_MANAGER" ? {
+                assignments: { some: {
+                  organizationId,
+                  membershipId: actor.id,
+                  assignmentRole: "PROJECT_MANAGER",
+                  status: "ACTIVE",
+                } },
+              } : {}),
+            },
             select: { id: true, clientId: true },
           });
           if (!project || project.clientId !== clientId) return { kind: "project-not-found" as const };
@@ -160,7 +184,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
       }
 
       const quotation = await tx.quotation.findFirst({
-        where: { organizationId, id: quotationId },
+        where: { ...authorizedQuotationWhere(actor), id: quotationId },
         include: {
           client: { select: { id: true, name: true, email: true, phone: true } },
           project: { select: { id: true, code: true, name: true, status: true } },
