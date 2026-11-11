@@ -62,6 +62,45 @@ describe("GET organization summary API tenant boundary", () => {
     expect(prisma.invoice.count).not.toHaveBeenCalled();
   });
 
+
+  it("limits Project Manager dashboard counts to assigned projects and hides the sales pipeline", async () => {
+    requireTenantRole.mockResolvedValue({
+      id: "pm-member-a", organizationId: "org-a", userId: "pm-user-a", role: "PROJECT_MANAGER",
+    });
+    prisma.client.count.mockResolvedValue(1);
+    prisma.project.count.mockResolvedValue(1);
+    prisma.invoice.count.mockResolvedValue(2);
+
+    const response = await GET(new Request("http://localhost/api/organizations/org-a/summary"), context("org-a"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      counts: { clients: 1, leads: 0, projects: 1, openInvoices: 2 },
+    });
+    expect(prisma.client.count).toHaveBeenCalledWith({ where: {
+      organizationId: "org-a",
+      projects: { some: { assignments: { some: {
+        organizationId: "org-a", membershipId: "pm-member-a",
+        assignmentRole: "PROJECT_MANAGER", status: "ACTIVE",
+      } } } },
+    } });
+    expect(prisma.project.count).toHaveBeenCalledWith({ where: {
+      organizationId: "org-a",
+      assignments: { some: {
+        organizationId: "org-a", membershipId: "pm-member-a",
+        assignmentRole: "PROJECT_MANAGER", status: "ACTIVE",
+      } },
+    } });
+    expect(prisma.invoice.count).toHaveBeenCalledWith({ where: {
+      organizationId: "org-a",
+      project: { assignments: { some: {
+        organizationId: "org-a", membershipId: "pm-member-a",
+        assignmentRole: "PROJECT_MANAGER", status: "ACTIVE",
+      } } },
+      status: { notIn: ["PAID", "VOID"] },
+    } });
+    expect(prisma.lead.count).not.toHaveBeenCalled();
+  });
   it("scopes every summary count to the authorized organization", async () => {
     requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "OWNER" });
     prisma.client.count.mockResolvedValue(2);
