@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, ProjectStatus, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedProjectWhere } from "@/lib/project-access-query";
 
 const projectSchema = z.object({
   clientId: z.string().trim().min(1).max(64),
@@ -55,9 +56,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
     if (!organizationId || organizationId.length > 64) {
       return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    const actor = await requireTenantContext(organizationId);
     const projects = await prisma.project.findMany({
-      where: { organizationId },
+      where: authorizedProjectWhere(actor),
       include: { client: { select: { id: true, name: true, email: true, phone: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 50,
@@ -134,6 +135,29 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
         },
         include: { client: { select: { id: true, name: true } } },
       });
+      if (actor.role === MembershipRole.PROJECT_MANAGER) {
+        const assignment = await tx.projectAssignment.create({
+          data: {
+            organizationId,
+            projectId: project.id,
+            membershipId: actor.id,
+            assignmentRole: "PROJECT_MANAGER",
+            assignedByMembershipId: actor.id,
+            status: "ACTIVE",
+          },
+          select: { id: true },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actorId: actor.userId,
+            action: "PROJECT_ASSIGNMENT_CREATED",
+            entityType: "ProjectAssignment",
+            entityId: assignment.id,
+            afterState: { projectId: project.id, membershipId: actor.id, assignmentRole: "PROJECT_MANAGER" },
+          },
+        });
+      }
       await tx.auditLog.create({
         data: {
           organizationId,
