@@ -68,6 +68,17 @@ export async function POST(
     }
 
     if (parsed.data.action === "upload") {
+      const hasProjectScope = Boolean(parsed.data.projectId);
+      const hasInvoiceScope = Boolean(parsed.data.invoiceId);
+      if (
+        !hasProjectScope
+        && !hasInvoiceScope
+        && actor.role !== "OWNER"
+        && actor.role !== "ADMIN"
+        && actor.role !== "STAFF"
+      ) {
+        return NextResponse.json({ error: "Unggahan tanpa relasi hanya diizinkan untuk Staff pada dokumen miliknya." }, { status: 403 });
+      }
       if (actor.role === "CLIENT") {
         return NextResponse.json({ error: "Client Portal hanya memiliki akses baca dokumen." }, { status: 403 });
       }
