@@ -4,7 +4,9 @@ type QuotationAccessActor = {
   role: string;
 };
 
-export function authorizedQuotationWhere(actor: QuotationAccessActor) {
+import type { Prisma } from "@dzaroza/database";
+
+export function authorizedQuotationWhere(actor: QuotationAccessActor): Prisma.QuotationWhereInput {
   const tenant = { organizationId: actor.organizationId };
   if (actor.role === "OWNER" || actor.role === "ADMIN" || actor.role === "FINANCE") {
     return tenant;
