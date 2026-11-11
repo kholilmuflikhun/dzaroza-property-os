@@ -135,13 +135,13 @@ export async function canManageDocument(
       return (document.invoice?.project?.assignments.length ?? 0) > 0
         && ["READ", "DOWNLOAD"].includes(action);
     }
-    if (actor.role === "SALES") return salesGranted && action === "READ";
-    if (actor.role === "CLIENT") return portalGranted && action === "READ";
+    if (actor.role === "SALES") return salesGranted && ["READ", "DOWNLOAD"].includes(action);
+    if (actor.role === "CLIENT") return portalGranted && ["READ", "DOWNLOAD"].includes(action);
     return false;
   }
 
-  if (actor.role === "SALES") return salesGranted && action === "READ";
-  if (actor.role === "CLIENT") return portalGranted && action === "READ";
+  if (actor.role === "SALES") return salesGranted && ["READ", "DOWNLOAD"].includes(action);
+  if (actor.role === "CLIENT") return portalGranted && ["READ", "DOWNLOAD"].includes(action);
 
   if (document.projectId) {
     const assigned = (document.project?.assignments.length ?? 0) > 0;
