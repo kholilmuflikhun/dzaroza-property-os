@@ -42,7 +42,13 @@ describe("organization clients API tenant boundary", () => {
     prisma.client.findMany.mockResolvedValue([{ id: "client-a", organizationId: "org-a" }]);
     const response = await GET(new Request("http://localhost/api/organizations/org-a/clients") as never, context);
     expect(response.status).toBe(200);
-    expect(prisma.client.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: "org-a" } }));
+    expect(prisma.client.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      organizationId: "org-a",
+      projects: { some: { assignments: { some: {
+        organizationId: "org-a", membershipId: "member-a",
+        assignmentRole: { in: ["CONTRIBUTOR", "VIEWER"] }, status: "ACTIVE",
+      } } } },
+    } }));
   });
 
   it("does not query clients if the user is not a member of the requested tenant", async () => {
@@ -53,10 +59,11 @@ describe("organization clients API tenant boundary", () => {
   });
 
   it("creates a client and audit log atomically", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
+    requireTenantRole.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const tx = {
       client: { create: vi.fn().mockResolvedValue({ id: "client-a", organizationId: "org-a", name: "PT Contoh", email: "admin@example.com", phone: null }) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-a" }) },
+      salesClientAccess: { create: vi.fn().mockResolvedValue({ id: "sales-grant-a" }) },
     };
     prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
     const response = await POST(request({ name: " PT Contoh ", email: "ADMIN@EXAMPLE.COM", phone: "" }), context);
@@ -64,6 +71,10 @@ describe("organization clients API tenant boundary", () => {
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
     expect(tx.client.create).toHaveBeenCalledWith({
       data: { organizationId: "org-a", name: "PT Contoh", email: "admin@example.com", phone: null },
+    });
+    expect(tx.salesClientAccess.create).toHaveBeenCalledWith({
+      data: { organizationId: "org-a", clientId: "client-a", membershipId: "sales-member-a", status: "ACTIVE" },
+      select: { id: true },
     });
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ organizationId: "org-a", actorId: "sales-a", action: "client.created" }),
