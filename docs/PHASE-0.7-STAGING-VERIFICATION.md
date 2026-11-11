@@ -9,7 +9,7 @@
 | Component | Repository | Commit | Deployment | Result |
 |---|---|---|---|---|
 | Website | `kholilmuflikhun/dzaroza-property` | `ef7238fac9aef12a2fcda407099ebc2dfff90336` | `dpl_7GK9vSexNNevRp2dVwwfenM2FMi9` | READY; initial staging build |
-| Website (environment refresh) | same | same | `dpl_BxrYKt5j1EVsmSfctX8L2X8GYMPk` | BUILDING at last status check; verify before sign-off |
+| Website (environment refresh) | same | same | `dpl_BxrYKt5j1EVsmSfctX8L2X8GYMPk` | READY |
 | OS | `kholilmuflikhun/dzaroza-property-os` | `766e64f6aba3058ca58778073ff5650efd30a646` | `dpl_7Bocct1Tsi1qqP1xV5ntpnJCWtBh` | READY |
 
 ### Deployment notes
@@ -117,7 +117,7 @@ Do not reuse Production keys. Add each value only to the corresponding staging V
 - [x] Project assignments and Sales/Client grants seeded.
 - [x] Staging-only secrets and Preview variables configured.
 - [x] Dedicated website Blob store created and token restricted to Preview.
-- [ ] Confirm latest Website environment-refresh deployment is READY.
+- [x] Confirm latest Website environment-refresh deployment is READY.
 - [ ] Configure staging Google OAuth credentials and verified Google test users.
 - [ ] Configure Midtrans Sandbox keys.
 - [ ] Configure Upstash Redis and Google Sheets staging integration.
