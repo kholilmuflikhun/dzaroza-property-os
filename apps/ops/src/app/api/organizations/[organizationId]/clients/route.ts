@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedClientWhere } from "@/lib/client-access-query";
 
 const clientSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -47,9 +48,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
     if (!organizationId || organizationId.length > 64) {
       return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    const actor = await requireTenantContext(organizationId);
     const clients = await prisma.client.findMany({
-      where: { organizationId },
+      where: authorizedClientWhere(actor),
       orderBy: [{ name: "asc" }, { id: "asc" }],
       take: 100,
     });
@@ -96,6 +97,27 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
           phone: parsed.data.phone,
         },
       });
+      if (actor.role === MembershipRole.SALES) {
+        const grant = await tx.salesClientAccess.create({
+          data: {
+            organizationId,
+            clientId: created.id,
+            membershipId: actor.id,
+            status: "ACTIVE",
+          },
+          select: { id: true },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actorId: actor.userId,
+            action: "CLIENT_ACCESS_GRANTED",
+            entityType: "SalesClientAccess",
+            entityId: grant.id,
+            afterState: { clientId: created.id, membershipId: actor.id, accessType: "SALES" },
+          },
+        });
+      }
       await tx.auditLog.create({
         data: {
           organizationId,
