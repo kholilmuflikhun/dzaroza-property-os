@@ -94,6 +94,16 @@ describe("document action authorization", () => {
     await expect(canManageDocument(actor("SALES"), "doc-a", "DOWNLOAD")).resolves.toBe(false);
   });
 
+
+  it("allows granted Sales and Client Portal members to download read-only documents", async () => {
+    findFirst.mockResolvedValue(document({
+      projectId: "project-a",
+      project: { assignments: [], client: { salesAccesses: [{ id: "sales-grant" }], portalAccesses: [{ id: "portal-grant" }] } },
+    }));
+    await expect(canManageDocument(actor("SALES"), "doc-a", "DOWNLOAD")).resolves.toBe(true);
+    await expect(canManageDocument(actor("CLIENT"), "doc-a", "DOWNLOAD")).resolves.toBe(true);
+    await expect(canManageDocument(actor("CLIENT"), "doc-a", "UPLOAD")).resolves.toBe(false);
+  });
   it("limits Staff unlinked access to their own uploads", async () => {
     findFirst.mockResolvedValue(document({ uploadedById: "user-a" }));
     await expect(canManageDocument(actor("STAFF"), "doc-a", "READ")).resolves.toBe(true);
