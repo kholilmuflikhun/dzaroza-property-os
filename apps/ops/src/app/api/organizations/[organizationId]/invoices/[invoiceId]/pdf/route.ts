@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@dzaroza/database";
-import { requireTenantContext, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
     if (!organizationId || organizationId.length > 64 || !invoiceId || invoiceId.length > 64) {
       return NextResponse.json({ error: "ID tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    await requireFinanceRead(organizationId);
     const [organization, invoice] = await Promise.all([
       prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true, currency: true } }),
       prisma.invoice.findFirst({
