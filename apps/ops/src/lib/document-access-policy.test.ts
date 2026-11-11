@@ -16,6 +16,8 @@ describe("document access policy", () => {
   });
   it("retains Sales read access only for explicitly assigned client records", () => {
     expect(canAccessDocument({ role: "SALES", userId: "s", scope: "CLIENT", salesClientAccess: true }, "READ")).toBe(true);
+    expect(canAccessDocument({ role: "SALES", userId: "s", scope: "CLIENT", salesClientAccess: true }, "DOWNLOAD")).toBe(true);
+    expect(canAccessDocument({ role: "SALES", userId: "s", scope: "CLIENT", salesClientAccess: true }, "UPLOAD")).toBe(false);
     expect(canAccessDocument({ role: "SALES", userId: "s", scope: "CLIENT", salesClientAccess: false }, "READ")).toBe(false);
     expect(canAccessDocument({ role: "SALES", userId: "s", scope: "INVOICE" }, "READ")).toBe(false);
   });
@@ -28,6 +30,7 @@ describe("document access policy", () => {
   it("requires explicit Client Portal linkage and read-only access", () => {
     const base = { role: "CLIENT" as const, userId: "client", scope: "PROJECT" as const, clientPortalAccess: true };
     expect(canAccessDocument(base, "READ")).toBe(true);
+    expect(canAccessDocument(base, "DOWNLOAD")).toBe(true);
     expect(canAccessDocument(base, "UPLOAD")).toBe(false);
     expect(canAccessDocument({ ...base, clientPortalAccess: false }, "READ")).toBe(false);
   });
