@@ -2,6 +2,11 @@ name: Phase 0.4 OS Source Import
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/phase-0-source-preservation
+    paths:
+      - .github/workflows/phase-0.4-os-import.yml
 
 permissions:
   contents: write
@@ -31,7 +36,8 @@ jobs:
           SOURCE="$RUNNER_TEMP/legacy"
           mkdir -p docs packages/database packages/shared
           cp "$SOURCE/README.md" docs/LEGACY-OS-README.md
-          rsync -a "$SOURCE/apps/ops/" ./
+          cp "$SOURCE/apps/ops/.env.example" docs/LEGACY-OPS-APP-ENV.example
+          rsync -a --exclude=".env.example" "$SOURCE/apps/ops/" ./
           rsync -a "$SOURCE/packages/database/" packages/database/
           rsync -a "$SOURCE/packages/shared/" packages/shared/
           for file in .env.example .gitignore package.json pnpm-workspace.yaml tsconfig.base.json turbo.json; do
@@ -45,6 +51,7 @@ jobs:
           for src in "$SOURCE"/apps/ops/* "$SOURCE"/apps/ops/.[!.]*; do
             [ -e "$src" ] || continue
             name="$(basename "$src")"
+            if [ "$name" = ".env.example" ]; then continue; fi
             if [ -f "$src" ]; then cmp "$src" "$name"; fi
             if [ -d "$src" ]; then diff -qr "$src" "$name"; fi
           done
