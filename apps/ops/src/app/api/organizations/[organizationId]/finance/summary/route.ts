@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@dzaroza/database";
 import { requireFinanceRead, toHttpError } from "@/lib/tenant";
+import { authorizedExpenseWhere, authorizedInvoiceWhere, authorizedPaymentWhere } from "@/lib/finance-access-query";
 
 function startOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`; }
@@ -9,17 +10,20 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    await requireFinanceRead(organizationId);
+    const actor = await requireFinanceRead(organizationId);
+    const invoiceWhere = authorizedInvoiceWhere(actor);
+    const paymentWhere = authorizedPaymentWhere(actor);
+    const expenseWhere = authorizedExpenseWhere(actor);
     const now = new Date();
     const currentMonth = startOfMonth(now);
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const [invoiceTotals, paymentTotals, expenseTotals, outstanding, monthlyPayments, monthlyExpenses] = await Promise.all([
-      prisma.invoice.aggregate({ where: { organizationId, createdAt: { gte: currentMonth }, status: { in: ["SENT", "PARTIALLY_PAID", "PAID", "OVERDUE"] } }, _sum: { total: true, paidAmount: true }, _count: { _all: true } }),
-      prisma.paymentTransaction.aggregate({ where: { organizationId, invoiceId: { not: null }, status: "SETTLEMENT", paidAt: { gte: currentMonth } }, _sum: { amount: true }, _count: { _all: true } }),
-      prisma.expense.aggregate({ where: { organizationId, incurredAt: { gte: currentMonth } }, _sum: { amount: true }, _count: { _all: true } }),
-      prisma.invoice.aggregate({ where: { organizationId, status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } }, _sum: { total: true, paidAmount: true }, _count: { _all: true } }),
-      prisma.paymentTransaction.findMany({ where: { organizationId, invoiceId: { not: null }, status: "SETTLEMENT", paidAt: { gte: sixMonthsAgo } }, select: { amount: true, paidAt: true } }),
-      prisma.expense.findMany({ where: { organizationId, incurredAt: { gte: sixMonthsAgo } }, select: { amount: true, incurredAt: true } }),
+      prisma.invoice.aggregate({ where: { ...invoiceWhere, createdAt: { gte: currentMonth }, status: { in: ["SENT", "PARTIALLY_PAID", "PAID", "OVERDUE"] } }, _sum: { total: true, paidAmount: true }, _count: { _all: true } }),
+      prisma.paymentTransaction.aggregate({ where: { ...paymentWhere, status: "SETTLEMENT", paidAt: { gte: currentMonth } }, _sum: { amount: true }, _count: { _all: true } }),
+      prisma.expense.aggregate({ where: { ...expenseWhere, incurredAt: { gte: currentMonth } }, _sum: { amount: true }, _count: { _all: true } }),
+      prisma.invoice.aggregate({ where: { ...invoiceWhere, status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } }, _sum: { total: true, paidAmount: true }, _count: { _all: true } }),
+      prisma.paymentTransaction.findMany({ where: { ...paymentWhere, status: "SETTLEMENT", paidAt: { gte: sixMonthsAgo } }, select: { amount: true, paidAt: true } }),
+      prisma.expense.findMany({ where: { ...expenseWhere, incurredAt: { gte: sixMonthsAgo } }, select: { amount: true, incurredAt: true } }),
     ]);
     const months = Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
