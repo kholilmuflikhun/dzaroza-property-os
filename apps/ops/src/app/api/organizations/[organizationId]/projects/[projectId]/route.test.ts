@@ -108,7 +108,7 @@ describe("organization project detail API", () => {
   });
 
   it("rejects a date range that conflicts with the stored start date", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "owner-a", role: "OWNER" });
+    requireTenantContext.mockResolvedValue({ id: "owner-member-a", organizationId: "org-a", userId: "owner-a", role: "OWNER" });
     const tx = setup();
     const response = await PATCH(request({ dueAt: "2026-09-01T00:00:00.000Z" }), context);
     expect(response.status).toBe(400);
