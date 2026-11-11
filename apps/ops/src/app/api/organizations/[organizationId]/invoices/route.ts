@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
-import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
 
 const itemSchema = z.object({
   description: z.string().trim().min(2).max(500),
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    await requireTenantContext(organizationId);
+    await requireFinanceRead(organizationId);
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? 50);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return NextResponse.json({ error: "Limit harus antara 1 dan 100." }, { status: 400 });
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    const actor = await requireTenantRole(organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.FINANCE, MembershipRole.PROJECT_MANAGER]);
+    const actor = await requireTenantRole(organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.FINANCE]);
     let body: unknown;
     try { body = await request.json(); } catch { return NextResponse.json({ error: "Payload JSON tidak valid." }, { status: 400 }); }
     const parsed = createSchema.safeParse(body);
