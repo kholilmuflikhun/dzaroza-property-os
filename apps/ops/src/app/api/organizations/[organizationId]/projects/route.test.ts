@@ -57,6 +57,7 @@ function setupTransaction(options: {
       count: vi.fn().mockResolvedValue(options.projectCount ?? 1),
       create: vi.fn().mockResolvedValue({ id: "project-a", organizationId: "org-a", clientId: "client-a", code: "PRJ-001", name: "Renovasi Rumah", status: "DRAFT", progress: 0, client: { id: "client-a", name: "Client A" } }),
     },
+    projectAssignment: { create: vi.fn().mockResolvedValue({ id: "assignment-a" }) },
     auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-a" }) },
   };
   prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
@@ -77,7 +78,13 @@ describe("organization projects API tenant boundary and quotas", () => {
     const response = await GET(new Request("http://localhost/api/organizations/org-a/projects") as never, context());
     expect(response.status).toBe(200);
     expect(prisma.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { organizationId: "org-a" },
+      where: {
+        organizationId: "org-a",
+        assignments: { some: {
+          organizationId: "org-a", membershipId: "member-a",
+          assignmentRole: { in: ["CONTRIBUTOR", "VIEWER"] }, status: "ACTIVE",
+        } },
+      },
       take: 50,
     }));
   });
@@ -90,7 +97,7 @@ describe("organization projects API tenant boundary and quotas", () => {
   });
 
   it("creates a project and audit entry atomically for an authorized project manager", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "manager-a", role: "PROJECT_MANAGER" });
+    requireTenantRole.mockResolvedValue({ id: "manager-member-a", organizationId: "org-a", userId: "manager-a", role: "PROJECT_MANAGER" });
     const tx = setupTransaction();
     const response = await POST(request(body()), context());
     expect(response.status).toBe(201);
@@ -102,6 +109,13 @@ describe("organization projects API tenant boundary and quotas", () => {
     expect(tx.project.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ organizationId: "org-a", clientId: "client-a", code: "PRJ-001", progress: 0 }),
     }));
+    expect(tx.projectAssignment.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-a", projectId: "project-a", membershipId: "manager-member-a",
+        assignmentRole: "PROJECT_MANAGER", assignedByMembershipId: "manager-member-a", status: "ACTIVE",
+      },
+      select: { id: true },
+    });
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ organizationId: "org-a", actorId: "manager-a", action: "project.created" }),
     }));
