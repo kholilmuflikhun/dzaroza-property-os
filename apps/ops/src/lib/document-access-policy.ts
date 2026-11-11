@@ -26,8 +26,7 @@ export function canAccessDocument(context: DocumentAccessContext, action: Docume
   }
 
   if (role === "CLIENT") {
-    return scope !== "UNLINKED"
-      && context.clientPortalAccess === true
+    return context.clientPortalAccess === true
       && action === "READ";
   }
 
@@ -54,7 +53,6 @@ export function canAccessDocument(context: DocumentAccessContext, action: Docume
 
   if (scope === "CLIENT") {
     if (role === "SALES") return context.salesClientAccess === true && action === "READ";
-    if (role === "CLIENT") return context.clientPortalAccess === true && action === "READ";
   }
   return false;
 }
