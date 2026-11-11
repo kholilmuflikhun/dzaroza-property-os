@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prisma, requireTenantContext } = vi.hoisted(() => ({
+const { prisma, requireTenantRole } = vi.hoisted(() => ({
   prisma: {
     client: { count: vi.fn() },
     lead: { count: vi.fn() },
     project: { count: vi.fn() },
     invoice: { count: vi.fn() },
   },
-  requireTenantContext: vi.fn(),
+  requireTenantRole: vi.fn(),
 }));
 
-vi.mock("@dzaroza/database", () => ({ prisma }));
+vi.mock("@dzaroza/database", () => ({
+  prisma,
+  MembershipRole: { OWNER: "OWNER", ADMIN: "ADMIN", FINANCE: "FINANCE", PROJECT_MANAGER: "PROJECT_MANAGER" },
+}));
 vi.mock("@/lib/tenant", () => ({
-  requireTenantContext,
+  requireTenantRole,
   toHttpError: (error: unknown) => {
     const name = error instanceof Error ? error.name : "";
     if (name === "UnauthorizedError") return { status: 401, message: "Autentikasi diperlukan." };
@@ -27,7 +30,7 @@ const context = (organizationId: string) => ({ params: Promise.resolve({ organiz
 
 describe("GET organization summary API tenant boundary", () => {
   beforeEach(() => {
-    requireTenantContext.mockReset();
+    requireTenantRole.mockReset();
     prisma.client.count.mockReset();
     prisma.lead.count.mockReset();
     prisma.project.count.mockReset();
@@ -35,7 +38,7 @@ describe("GET organization summary API tenant boundary", () => {
   });
 
   it("returns 401 and does not query tenant data without a session", async () => {
-    requireTenantContext.mockRejectedValue(Object.assign(new Error("Unauthenticated"), { name: "UnauthorizedError" }));
+    requireTenantRole.mockRejectedValue(Object.assign(new Error("Unauthenticated"), { name: "UnauthorizedError" }));
 
     const response = await GET(new Request("http://localhost/api/organizations/org-a/summary"), context("org-a"));
 
@@ -47,12 +50,12 @@ describe("GET organization summary API tenant boundary", () => {
   });
 
   it("returns 403 and does not query data when the user has no membership in the requested tenant", async () => {
-    requireTenantContext.mockRejectedValue(Object.assign(new Error("Forbidden"), { name: "ForbiddenError" }));
+    requireTenantRole.mockRejectedValue(Object.assign(new Error("Forbidden"), { name: "ForbiddenError" }));
 
     const response = await GET(new Request("http://localhost/api/organizations/org-b/summary"), context("org-b"));
 
     expect(response.status).toBe(403);
-    expect(requireTenantContext).toHaveBeenCalledWith("org-b");
+    expect(requireTenantRole).toHaveBeenCalledWith("org-b", ["OWNER", "ADMIN", "FINANCE", "PROJECT_MANAGER"]);
     expect(prisma.client.count).not.toHaveBeenCalled();
     expect(prisma.lead.count).not.toHaveBeenCalled();
     expect(prisma.project.count).not.toHaveBeenCalled();
@@ -60,7 +63,7 @@ describe("GET organization summary API tenant boundary", () => {
   });
 
   it("scopes every summary count to the authorized organization", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "OWNER" });
+    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "OWNER" });
     prisma.client.count.mockResolvedValue(2);
     prisma.lead.count.mockResolvedValue(3);
     prisma.project.count.mockResolvedValue(4);
