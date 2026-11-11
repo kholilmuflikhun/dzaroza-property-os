@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
-import { requireTenantContext, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("issue") }),
@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
   try {
     const { organizationId, invoiceId } = await context.params;
     if (!organizationId || organizationId.length > 64 || !invoiceId || invoiceId.length > 64) return NextResponse.json({ error: "ID tidak valid." }, { status: 400 });
-    await requireTenantContext(organizationId);
+    await requireFinanceRead(organizationId);
     const invoice = await prisma.invoice.findFirst({
       where: { organizationId, id: invoiceId },
       include: {
