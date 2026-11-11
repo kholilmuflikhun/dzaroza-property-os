@@ -50,12 +50,16 @@ describe("organization quotations API", () => {
   });
 
   it("lists quotations within the authorized organization and filters by status", async () => {
-    requireTenantContext.mockResolvedValue({ organizationId: "org-a", userId: "user-a", role: "STAFF" });
+    requireTenantContext.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     prisma.quotation.findMany.mockResolvedValue([]);
     const response = await GET(getRequest("?status=DRAFT&limit=25"), context);
     expect(response.status).toBe(200);
     expect(prisma.quotation.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { organizationId: "org-a", status: "DRAFT" }, take: 26,
+      where: {
+        organizationId: "org-a",
+        client: { salesAccesses: { some: { organizationId: "org-a", membershipId: "sales-member-a", status: "ACTIVE" } } },
+        status: "DRAFT",
+      }, take: 26,
     }));
   });
 
@@ -67,15 +71,15 @@ describe("organization quotations API", () => {
   });
 
   it("creates quotation items, calculates totals on the server, and writes audit atomically", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
+    requireTenantRole.mockResolvedValue({ id: "sales-member-a", organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const quotation = {
       id: "quotation-a", organizationId: "org-a", number: "QT-TEST-001", clientId: "client-a",
       projectId: null, subtotal: "250.00", discount: "10.00", tax: "12.00", total: "252.00",
       items: [{ description: "Consultation", quantity: "2.000", unitPrice: "125.00", lineTotal: "250.00" }],
     };
     const tx = {
-      client: { findUnique: vi.fn().mockResolvedValue({ id: "client-a" }) },
-      project: { findUnique: vi.fn() },
+      client: { findFirst: vi.fn().mockResolvedValue({ id: "client-a" }) },
+      project: { findFirst: vi.fn() },
       quotation: { create: vi.fn().mockResolvedValue(quotation) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-a" }) },
     };
@@ -110,8 +114,8 @@ describe("organization quotations API", () => {
   it("rejects cross-tenant client references and unauthorized roles", async () => {
     requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "sales-a", role: "SALES" });
     const tx = {
-      client: { findUnique: vi.fn().mockResolvedValue(null) },
-      project: { findUnique: vi.fn() }, quotation: { create: vi.fn() }, auditLog: { create: vi.fn() },
+      client: { findFirst: vi.fn().mockResolvedValue(null) },
+      project: { findFirst: vi.fn() }, quotation: { create: vi.fn() }, auditLog: { create: vi.fn() },
     };
     prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
     const forbiddenClient = await POST(postRequest({
