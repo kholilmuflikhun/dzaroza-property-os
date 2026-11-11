@@ -1,4 +1,4 @@
-name: Phase 0.5 OS Quality Gates
+name: Phase 0.6 OS Security & Release Readiness
 on:
   push:
     branches: [feat/phase-0-source-preservation]
