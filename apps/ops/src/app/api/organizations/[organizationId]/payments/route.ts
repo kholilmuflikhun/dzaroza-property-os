@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MembershipRole, Prisma, prisma } from "@dzaroza/database";
 import { z } from "zod";
 import { requireFinanceRead, requireTenantRole, toHttpError } from "@/lib/tenant";
+import { authorizedInvoiceWhere, authorizedPaymentWhere } from "@/lib/finance-access-query";
 
 const paymentSchema = z.object({
   invoiceId: z.string().trim().min(1).max(64),
@@ -15,12 +16,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
   try {
     const { organizationId } = await context.params;
     if (!organizationId || organizationId.length > 64) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
-    await requireFinanceRead(organizationId);
+    const actor = await requireFinanceRead(organizationId);
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? 50);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return NextResponse.json({ error: "Limit harus antara 1 dan 100." }, { status: 400 });
     const rows = await prisma.paymentTransaction.findMany({
-      where: { organizationId, invoiceId: { not: null } },
+      where: authorizedPaymentWhere(actor),
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit,
       include: { invoice: { select: { id: true, number: true, total: true } } },
     });
