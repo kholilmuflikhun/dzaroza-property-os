@@ -1,0 +1,71 @@
+name: Phase 0.4 OS Source Import
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/phase-0-source-preservation
+          fetch-depth: 0
+
+      - name: Fetch pinned source
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/kholilmuflikhun/dzarozaproperty.git "$RUNNER_TEMP/legacy"
+          git -C "$RUNNER_TEMP/legacy" sparse-checkout init --cone
+          git -C "$RUNNER_TEMP/legacy" sparse-checkout set apps/ops packages/database packages/shared
+          git -C "$RUNNER_TEMP/legacy" fetch --depth=1 origin 7e35a55deec543fd74e9ab698fdc8a86fba11cb9
+          git -C "$RUNNER_TEMP/legacy" checkout --detach 7e35a55deec543fd74e9ab698fdc8a86fba11cb9
+
+      - name: Import application, packages, and workspace configuration
+        run: |
+          set -euo pipefail
+          SOURCE="$RUNNER_TEMP/legacy"
+          mkdir -p docs packages/database packages/shared
+          cp "$SOURCE/README.md" docs/LEGACY-OS-README.md
+          rsync -a "$SOURCE/apps/ops/" ./
+          rsync -a "$SOURCE/packages/database/" packages/database/
+          rsync -a "$SOURCE/packages/shared/" packages/shared/
+          for file in .env.example .gitignore package.json pnpm-workspace.yaml tsconfig.base.json turbo.json; do
+            cp "$SOURCE/$file" "$file"
+          done
+
+      - name: Verify source file equality
+        run: |
+          set -euo pipefail
+          SOURCE="$RUNNER_TEMP/legacy"
+          for src in "$SOURCE"/apps/ops/* "$SOURCE"/apps/ops/.[!.]*; do
+            [ -e "$src" ] || continue
+            name="$(basename "$src")"
+            if [ -f "$src" ]; then cmp "$src" "$name"; fi
+            if [ -d "$src" ]; then diff -qr "$src" "$name"; fi
+          done
+          diff -qr "$SOURCE/packages/database" packages/database
+          diff -qr "$SOURCE/packages/shared" packages/shared
+          for file in .env.example .gitignore package.json pnpm-workspace.yaml tsconfig.base.json turbo.json; do
+            cmp "$SOURCE/$file" "$file"
+          done
+
+      - name: Generate independent workspace lockfile
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.18.0 --activate
+          pnpm install --lockfile-only
+
+      - name: Commit migration snapshot
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(phase-0.4): import pinned OS source and standalone lockfile"
+          git push origin HEAD:feat/phase-0-source-preservation
