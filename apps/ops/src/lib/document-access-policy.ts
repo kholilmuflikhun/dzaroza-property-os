@@ -20,7 +20,7 @@ export function canAccessDocument(context: DocumentAccessContext, action: Docume
   if (role === "OWNER" || role === "ADMIN") return true;
 
   if (scope === "UNLINKED") {
-    return (role === "STAFF" || role === "FINANCE" || role === "SALES" || role === "PROJECT_MANAGER")
+    return role === "STAFF"
       && uploaderId === userId
       && (action === "READ" || action === "UPLOAD" || action === "FINALIZE" || action === "DOWNLOAD");
   }
