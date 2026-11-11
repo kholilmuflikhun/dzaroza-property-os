@@ -1,0 +1,112 @@
+name: Phase 0.4 — Import Dzaroza OS Snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/phase-0-source-preservation
+    paths:
+      - .github/workflows/phase-0.4-os-import.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-0-4-os-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout target OS feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/phase-0-source-preservation
+          fetch-depth: 0
+
+      - name: Fetch pinned legacy OS snapshot
+        env:
+          SOURCE_COMMIT: 7e35a55deec543fd74e9ab698fdc8a86fba11cb9
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/kholilmuflikhun/dzarozaproperty.git "$RUNNER_TEMP/legacy"
+          git -C "$RUNNER_TEMP/legacy" sparse-checkout init --cone
+          git -C "$RUNNER_TEMP/legacy" sparse-checkout set apps/ops packages/database packages/shared
+          git -C "$RUNNER_TEMP/legacy" fetch --depth=1 origin "$SOURCE_COMMIT"
+          git -C "$RUNNER_TEMP/legacy" checkout --detach "$SOURCE_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/legacy" rev-parse HEAD)" = "$SOURCE_COMMIT"
+
+      - name: Import OS application and workspace packages
+        run: |
+          set -euo pipefail
+          SOURCE="$RUNNER_TEMP/legacy"
+          test -f "$SOURCE/apps/ops/package.json"
+          test -f "$SOURCE/packages/database/package.json"
+          test -f "$SOURCE/packages/shared/package.json"
+          mkdir -p docs packages/database packages/shared
+          cp "$SOURCE/README.md" docs/LEGACY-OS-README.md
+          rsync -a "$SOURCE/apps/ops/" ./
+          rsync -a "$SOURCE/packages/database/" packages/database/
+          rsync -a "$SOURCE/packages/shared/" packages/shared/
+          for file in .env.example .gitignore package.json pnpm-workspace.yaml tsconfig.base.json turbo.json; do
+            cp "$SOURCE/$file" "$file"
+          done
+
+      - name: Verify imported source with SHA-256
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          source = Path("$RUNNER_TEMP/legacy")
+          mappings = [
+              (source / "apps/ops", Path(".")),
+              (source / "packages/database", Path("packages/database")),
+              (source / "packages/shared", Path("packages/shared")),
+          ]
+          root_files = [".env.example", ".gitignore", "package.json", "pnpm-workspace.yaml", "tsconfig.base.json", "turbo.json"]
+          checked = 0
+          def digest(path):
+              h = hashlib.sha256()
+              with path.open("rb") as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+          for src_dir, dst_dir in mappings:
+              for src in src_dir.rglob("*"):
+                  if not src.is_file():
+                      continue
+                  rel = src.relative_to(src_dir)
+                  dst = dst_dir / rel
+                  if not dst.is_file() or digest(src) != digest(dst):
+                      raise SystemExit(f"SHA-256 mismatch: {src} -> {dst}")
+                  checked += 1
+          for name in root_files:
+              src, dst = source / name, Path(name)
+              if not dst.is_file() or digest(src) != digest(dst):
+                  raise SystemExit(f"SHA-256 mismatch: {name}")
+              checked += 1
+          print(f"SHA-256 verified for {checked} imported files.")
+          PY
+
+      - name: Generate independent OS lockfile
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.18.0 --activate
+          pnpm install --lockfile-only
+
+      - name: Commit imported OS source to migration branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(phase-0.4): import pinned OS source and generate standalone lockfile"
+          git push origin HEAD:feat/phase-0-source-preservation
