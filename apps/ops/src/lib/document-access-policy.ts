@@ -27,7 +27,7 @@ export function canAccessDocument(context: DocumentAccessContext, action: Docume
 
   if (role === "CLIENT") {
     return context.clientPortalAccess === true
-      && action === "READ";
+      && (action === "READ" || action === "DOWNLOAD");
   }
 
   if (scope === "INVOICE") {
@@ -52,7 +52,7 @@ export function canAccessDocument(context: DocumentAccessContext, action: Docume
   }
 
   if (scope === "CLIENT") {
-    if (role === "SALES") return context.salesClientAccess === true && action === "READ";
+    if (role === "SALES") return context.salesClientAccess === true && (action === "READ" || action === "DOWNLOAD");
   }
   return false;
 }
