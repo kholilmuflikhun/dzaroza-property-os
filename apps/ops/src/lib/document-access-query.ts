@@ -36,20 +36,86 @@ export async function canManageDocument(
   action: "READ" | "UPLOAD" | "FINALIZE" | "DOWNLOAD",
 ) {
   const document = await prisma.document.findFirst({
-    where: { id: documentId, organizationId: actor.organizationId, deletedAt: null },
+    where: {
+      id: documentId,
+      organizationId: actor.organizationId,
+      deletedAt: null,
+    },
     select: {
-      id: true, uploadedById: true, projectId: true, invoiceId: true,
-      project: { select: {
-        assignments: { where: { membershipId: actor.id, status: "ACTIVE", ...(actor.role === "PROJECT_MANAGER" ? { assignmentRole: "PROJECT_MANAGER" } : {}) }, select: { id: true } },
-        client: { select: { salesAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } }, portalAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } } } },
-      } },
-      invoice: { select: {
-        project: { select: {
-          assignments: { where: { membershipId: actor.id, status: "ACTIVE", assignmentRole: "PROJECT_MANAGER" }, select: { id: true } },
-          client: { select: { salesAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } }, portalAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } } } },
-        } },
-        quotation: { select: { client: { select: { salesAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } }, portalAccesses: { where: { membershipId: actor.id, status: "ACTIVE" }, select: { id: true } } } } },
-      } },
+      id: true,
+      uploadedById: true,
+      projectId: true,
+      invoiceId: true,
+      project: {
+        select: {
+          assignments: {
+            where: {
+              membershipId: actor.id,
+              status: "ACTIVE",
+              ...(actor.role === "PROJECT_MANAGER"
+                ? { assignmentRole: "PROJECT_MANAGER" }
+                : {}),
+            },
+            select: { id: true },
+          },
+          client: {
+            select: {
+              salesAccesses: {
+                where: { membershipId: actor.id, status: "ACTIVE" },
+                select: { id: true },
+              },
+              portalAccesses: {
+                where: { membershipId: actor.id, status: "ACTIVE" },
+                select: { id: true },
+              },
+            },
+          },
+        },
+      },
+      invoice: {
+        select: {
+          project: {
+            select: {
+              assignments: {
+                where: {
+                  membershipId: actor.id,
+                  status: "ACTIVE",
+                  assignmentRole: "PROJECT_MANAGER",
+                },
+                select: { id: true },
+              },
+              client: {
+                select: {
+                  salesAccesses: {
+                    where: { membershipId: actor.id, status: "ACTIVE" },
+                    select: { id: true },
+                  },
+                  portalAccesses: {
+                    where: { membershipId: actor.id, status: "ACTIVE" },
+                    select: { id: true },
+                  },
+                },
+              },
+            },
+          },
+          quotation: {
+            select: {
+              client: {
+                select: {
+                  salesAccesses: {
+                    where: { membershipId: actor.id, status: "ACTIVE" },
+                    select: { id: true },
+                  },
+                  portalAccesses: {
+                    where: { membershipId: actor.id, status: "ACTIVE" },
+                    select: { id: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
   if (!document) return false;
