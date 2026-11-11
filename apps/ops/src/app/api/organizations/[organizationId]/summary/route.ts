@@ -13,7 +13,6 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
       MembershipRole.ADMIN,
       MembershipRole.FINANCE,
       MembershipRole.PROJECT_MANAGER,
-      MembershipRole.SALES,
     ]);
     const [clients, leads, projects, openInvoices] = await Promise.all([
       prisma.client.count({ where: { organizationId } }),
