@@ -39,6 +39,7 @@ function setup(current: Record<string, unknown> | null = {
       findFirst: vi.fn().mockResolvedValue(current),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    projectAssignment: { findFirst: vi.fn().mockResolvedValue({ id: "assignment-a" }) },
     client: { findUnique: vi.fn().mockResolvedValue({ id: "client-b" }) },
     auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-a" }) },
   };
@@ -59,7 +60,10 @@ describe("organization project detail API", () => {
     prisma.project.findFirst.mockResolvedValue({ id: "project-a", organizationId: "org-a" });
     const response = await GET(new Request("http://localhost") as never, context);
     expect(response.status).toBe(200);
-    expect(prisma.project.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: "org-a", id: "project-a" } }));
+    expect(prisma.project.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: "org-a", id: "project-a", assignments: { some: {
+        organizationId: "org-a", membershipId: "member-a",
+        assignmentRole: { in: ["CONTRIBUTOR", "VIEWER"] }, status: "ACTIVE",
+      } } } }));
   });
 
   it("returns 404 for a project outside the tenant", async () => {
@@ -70,7 +74,7 @@ describe("organization project detail API", () => {
   });
 
   it("updates project and audit entry in one transaction", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "manager-a", role: "PROJECT_MANAGER" });
+    requireTenantContext.mockResolvedValue({ id: "manager-member-a", organizationId: "org-a", userId: "manager-a", role: "PROJECT_MANAGER" });
     const tx = setup();
     tx.project.findFirst.mockResolvedValueOnce({
       id: "project-a", organizationId: "org-a", clientId: "client-a", code: "P-1", name: "Project",
@@ -84,8 +88,18 @@ describe("organization project detail API", () => {
     expect(tx.auditLog.create).toHaveBeenCalled();
   });
 
+
+  it("denies Project Manager updates when no active managed-project assignment exists", async () => {
+    requireTenantContext.mockResolvedValue({ id: "manager-member-a", organizationId: "org-a", userId: "manager-a", role: "PROJECT_MANAGER" });
+    const tx = setup();
+    tx.projectAssignment.findFirst.mockResolvedValue(null);
+    const response = await PATCH(request({ name: "Unauthorized change" }), context);
+    expect(response.status).toBe(403);
+    expect(tx.project.updateMany).not.toHaveBeenCalled();
+  });
+
   it("rejects a client from another organization", async () => {
-    requireTenantRole.mockResolvedValue({ organizationId: "org-a", userId: "owner-a", role: "OWNER" });
+    requireTenantContext.mockResolvedValue({ id: "owner-member-a", organizationId: "org-a", userId: "owner-a", role: "OWNER" });
     const tx = setup();
     tx.client.findUnique.mockResolvedValue(null);
     const response = await PATCH(request({ clientId: "client-b" }), context);
