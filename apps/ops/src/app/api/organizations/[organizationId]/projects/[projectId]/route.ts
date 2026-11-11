@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
     const { organizationId, projectId } = await context.params;
     if (!validIds(organizationId, projectId)) return NextResponse.json({ error: "ID organisasi atau proyek tidak valid." }, { status: 400 });
     const actor = await requireTenantContext(organizationId);
-    if (![MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.PROJECT_MANAGER].includes(actor.role)) {
+    if (actor.role !== MembershipRole.OWNER && actor.role !== MembershipRole.ADMIN && actor.role !== MembershipRole.PROJECT_MANAGER) {
       return NextResponse.json({ error: "Akses perubahan proyek tidak diizinkan." }, { status: 403 });
     }
     let body: unknown;
