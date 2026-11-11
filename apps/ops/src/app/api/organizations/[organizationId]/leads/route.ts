@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ org
     if (!organizationId || organizationId.length > 64) {
       return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
     }
-    await requireTenantContext(organizationId);
+    await requireTenantRole(organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.SALES]);
     const url = new URL(request.url);
     const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
     if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
@@ -95,7 +95,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
     const actor = await requireTenantRole(organizationId, [
       MembershipRole.OWNER,
       MembershipRole.ADMIN,
-      MembershipRole.PROJECT_MANAGER,
       MembershipRole.SALES,
     ]);
 
