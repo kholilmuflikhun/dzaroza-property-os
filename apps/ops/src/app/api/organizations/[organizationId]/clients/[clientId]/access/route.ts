@@ -55,13 +55,36 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     try { body = await request.json(); } catch { return NextResponse.json({ error: "Payload JSON tidak valid." }, { status: 400 }); }
     const parsed = grantSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: "Grant akses tidak valid." }, { status: 400 });
-    const model = parsed.data.accessType === "SALES" ? prisma.salesClientAccess : prisma.clientPortalAccess;
-    const grant = await model.findFirst({ where: { organizationId, clientId, membershipId: parsed.data.membershipId, status: "ACTIVE" }, select: { id: true } });
-    if (!grant) return NextResponse.json({ error: "Grant aktif tidak ditemukan." }, { status: 404 });
-    const changed = await model.updateMany({ where: { id: grant.id, organizationId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date() } });
-    if (changed.count !== 1) return NextResponse.json({ error: "Grant berubah; muat ulang dan coba kembali." }, { status: 409 });
+    let grantId: string;
+    let changedCount: number;
+    if (parsed.data.accessType === "SALES") {
+      const grant = await prisma.salesClientAccess.findFirst({
+        where: { organizationId, clientId, membershipId: parsed.data.membershipId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (!grant) return NextResponse.json({ error: "Grant aktif tidak ditemukan." }, { status: 404 });
+      grantId = grant.id;
+      const changed = await prisma.salesClientAccess.updateMany({
+        where: { id: grant.id, organizationId, status: "ACTIVE" },
+        data: { status: "REVOKED", revokedAt: new Date() },
+      });
+      changedCount = changed.count;
+    } else {
+      const grant = await prisma.clientPortalAccess.findFirst({
+        where: { organizationId, clientId, membershipId: parsed.data.membershipId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (!grant) return NextResponse.json({ error: "Grant aktif tidak ditemukan." }, { status: 404 });
+      grantId = grant.id;
+      const changed = await prisma.clientPortalAccess.updateMany({
+        where: { id: grant.id, organizationId, status: "ACTIVE" },
+        data: { status: "REVOKED", revokedAt: new Date() },
+      });
+      changedCount = changed.count;
+    }
+    if (changedCount !== 1) return NextResponse.json({ error: "Grant berubah; muat ulang dan coba kembali." }, { status: 409 });
     await prisma.auditLog.create({
-      data: { organizationId, actorId: actor.userId, action: "CLIENT_ACCESS_REVOKED", entityType: parsed.data.accessType === "SALES" ? "SalesClientAccess" : "ClientPortalAccess", entityId: grant.id, afterState: { status: "REVOKED" } },
+      data: { organizationId, actorId: actor.userId, action: "CLIENT_ACCESS_REVOKED", entityType: parsed.data.accessType === "SALES" ? "SalesClientAccess" : "ClientPortalAccess", entityId: grantId, afterState: { status: "REVOKED" } },
     });
     return NextResponse.json({ revoked: true });
   } catch (error) {
