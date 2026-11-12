@@ -21,7 +21,9 @@ This phase standardizes the authenticated organization workspace shell across th
 ## Validation
 - Static transformation guards passed for shell activation, shared layout wrapping, and removal of duplicated module wrappers.
 - GitHub Actions quality gates are configured to run on pushes to this Phase 0.8 branch.
-- TypeScript, unit tests, Prisma migration checks, and production build results are pending CI completion.
+- GitHub Actions run `43206437328` completed successfully on commit `aa68abe39abc6a5feb3b68983d36133e4fd7d745`.
+- Frozen dependency installation, Prisma Client generation, all migrations against an isolated PostgreSQL CI database, tenant-integrity SQL, TypeScript, 42 test files / 243 tests, and the production build all passed.
+- Vercel Preview for the new branch did not build because `DIRECT_URL` is not configured for this branch; the previous branch's branch-scoped Preview variables do not automatically apply. This is an environment-scope issue, not a CI build failure. No credential was requested or changed.
 - Browser-based visual/responsive verification remains pending because the Preview environment is SSO-protected and no authenticated browser session is available.
 
 ## Follow-up
