@@ -1,5 +1,6 @@
-import Link from "next/link";
 "use client";
+
+import Link from "next/link";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
