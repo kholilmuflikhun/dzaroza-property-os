@@ -40,18 +40,29 @@ export default function QuotationManagementPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [discount, setDiscount] = useState("0");
   const [tax, setTax] = useState("0");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const cursor = cursorHistory[cursorHistory.length - 1] ?? null;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requestedCursor: string | null = cursor) => {
     setLoading(true); setError("");
     try {
-      const response = await fetch(endpoint, { cache: "no-store" });
+      const query = new URLSearchParams({ limit: "20" });
+      if (statusFilter) query.set("status", statusFilter);
+      if (requestedCursor) query.set("cursor", requestedCursor);
+      const response = await fetch(`${endpoint}?${query.toString()}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Gagal memuat quotation.");
       setQuotations(payload.quotations ?? []);
+      setNextCursor(payload.pagination?.nextCursor ?? null);
+      setHasMore(Boolean(payload.pagination?.hasMore));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Gagal memuat quotation.");
     } finally { setLoading(false); }
-  }, [endpoint]);
+  }, [endpoint, statusFilter, cursor]);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -103,12 +114,19 @@ export default function QuotationManagementPage() {
       if (!response.ok) throw new Error(payload.error ?? "Quotation gagal dibuat.");
       setNotice(`Quotation ${payload.quotation.number} berhasil dibuat sebagai Draft.`);
       setClientId(""); setProjectId(""); setDescription(""); setQuantity("1"); setUnitPrice(""); setDiscount("0"); setTax("0");
-      await load();
+      setCursorHistory([]);
+      await load(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Quotation gagal dibuat."); }
     finally { setWorking(null); }
   }
 
   async function quotationAction(quotation: Quotation, action: "send" | "approval" | "convert" | "invoice") {
+    const confirmations: Partial<Record<typeof action, string>> = {
+      send: `Terbitkan quotation ${quotation.number} kepada klien?`,
+      convert: `Konversikan quotation ${quotation.number} menjadi proyek baru?`,
+      invoice: `Buat invoice berdasarkan quotation ${quotation.number}?`,
+    };
+    if (confirmations[action] && !window.confirm(confirmations[action]!)) return;
     setWorking(`${quotation.id}:${action}`); setError(""); setNotice("");
     try {
       let response: Response;
@@ -207,9 +225,19 @@ export default function QuotationManagementPage() {
       </section>
 
       <section className="mt-7">
-        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-950">Daftar quotation</h2><button onClick={() => void load()} className="text-sm font-semibold text-blue-700">Muat ulang</button></div>
-        {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Memuat quotation…</p> : quotations.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Belum ada quotation.</p> : <div className="grid gap-4">
-          {quotations.map((quotation) => <article key={quotation.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Daftar quotation</h2><p className="text-xs text-slate-500">Pantau penawaran dan tindak lanjut persetujuan klien.</p></div><button onClick={() => void load()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">Muat ulang</button></div>
+        <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+          <label className="text-xs font-semibold text-slate-600">Cari quotation<input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Nomor, nama klien, atau proyek…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal"/></label>
+          <label className="text-xs font-semibold text-slate-600">Filter status<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setCursorHistory([]); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua status</option><option value="DRAFT">Draft</option><option value="SENT">Menunggu klien</option><option value="ACCEPTED">Disetujui</option><option value="REJECTED">Ditolak</option><option value="EXPIRED">Kedaluwarsa</option><option value="CONVERTED">Menjadi proyek</option></select></label>
+        </div>
+        {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Memuat quotation…</p> : quotations.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">{statusFilter ? "Tidak ada quotation dengan status ini." : "Belum ada quotation."}</p> : quotations.filter((quotation) => {
+          const term = searchTerm.trim().toLocaleLowerCase("id-ID");
+          return !term || [quotation.number, quotation.client.name, quotation.project?.name, quotation.project?.code].some((value) => value?.toLocaleLowerCase("id-ID").includes(term));
+        }).length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Tidak ada hasil yang cocok. Ubah kata kunci pencarian.</p> : <div className="grid gap-4">
+          {quotations.filter((quotation) => {
+            const term = searchTerm.trim().toLocaleLowerCase("id-ID");
+            return !term || [quotation.number, quotation.client.name, quotation.project?.name, quotation.project?.code].some((value) => value?.toLocaleLowerCase("id-ID").includes(term));
+          }).map((quotation) => <article key={quotation.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{quotation.number}</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{quotation.client.name}</h3><p className="mt-1 text-xs text-slate-500">{quotation.project ? `${quotation.project.code} · ${quotation.project.name}` : "Belum terhubung ke proyek"} · {new Date(quotation.createdAt).toLocaleDateString("id-ID")}</p></div>
               <StatusBadge status={quotation.status} label={labels[quotation.status] ?? quotation.status} />
