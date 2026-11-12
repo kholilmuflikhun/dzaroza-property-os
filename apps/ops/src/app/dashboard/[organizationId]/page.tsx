@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@dzaroza/database";
 import { requireTenantContext } from "@/lib/tenant";
 import { UnauthorizedError, ForbiddenError } from "@/lib/errors";
-import { DashboardShell } from "@/components/dashboard-shell";
 
 const modules = [
   { href: "quotations", eyebrow: "Penjualan", title: "Penawaran & Persetujuan", description: "Susun penawaran, kirim tautan persetujuan kepada klien, dan konversikan penawaran yang disetujui menjadi proyek.", icon: FileText, accent: "bg-blue-50 text-blue-700" },
@@ -30,7 +29,7 @@ export default async function OrganizationDashboard({ params }: { params: Promis
   if (!organization) notFound();
 
   return (
-    <DashboardShell organizationId={organization.id} organizationName={organization.name} role={membership.role}>
+    <>
       <section className="overflow-hidden rounded-3xl bg-slate-950 px-6 py-8 text-white shadow-sm sm:px-9 sm:py-10">
         <div className="max-w-2xl">
           <p className="text-xs font-bold uppercase tracking-[.2em] text-blue-300">Dzaroza Property OS</p>
@@ -73,6 +72,6 @@ export default async function OrganizationDashboard({ params }: { params: Promis
           <div><dt className="text-xs text-slate-400">Zona waktu</dt><dd className="mt-1 text-sm font-medium text-slate-800">{organization.timezone}</dd></div>
         </dl>
       </section>
-    </DashboardShell>
+    </>
   );
 }
