@@ -42,23 +42,34 @@ export default function InvoiceManagementPage() {
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [payments, setPayments] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const cursor = cursorHistory[cursorHistory.length - 1] ?? null;
 
   const endpoint = `/api/organizations/${encodeURIComponent(organizationId)}/invoices`;
 
-  const loadInvoices = useCallback(async () => {
+  const loadInvoices = useCallback(async (requestedCursor: string | null = cursor) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(endpoint, { cache: "no-store" });
+      const query = new URLSearchParams({ limit: "20" });
+      if (statusFilter) query.set("status", statusFilter);
+      if (requestedCursor) query.set("cursor", requestedCursor);
+      const response = await fetch(`${endpoint}?${query.toString()}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Gagal memuat invoice.");
       setInvoices(payload.invoices ?? []);
+      setNextCursor(payload.pagination?.nextCursor ?? null);
+      setHasMore(Boolean(payload.pagination?.hasMore));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Gagal memuat invoice.");
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, statusFilter, cursor]);
 
   useEffect(() => { void loadInvoices(); }, [loadInvoices]);
 
@@ -102,7 +113,8 @@ export default function InvoiceManagementPage() {
       if (!response.ok) throw new Error(payload.error ?? "Invoice gagal dibuat.");
       setNotice(`Invoice ${payload.invoice.number} berhasil dibuat sebagai Draft.`);
       setProjectId(""); setDescription(""); setQuantity("1"); setUnitPrice("");
-      await loadInvoices();
+      setCursorHistory([]);
+      await loadInvoices(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Invoice gagal dibuat.");
     } finally {
@@ -111,6 +123,12 @@ export default function InvoiceManagementPage() {
   }
 
   async function runInvoiceAction(invoice: Invoice, action: "issue" | "send" | "pdf" | "checkout" | "payment") {
+    const confirmations: Partial<Record<typeof action, string>> = {
+      issue: `Terbitkan invoice ${invoice.number}? Setelah diterbitkan, status invoice akan berubah.`,
+      checkout: `Buat sesi pembayaran untuk invoice ${invoice.number}?`,
+      payment: `Catat pembayaran untuk invoice ${invoice.number} sebesar ${money(payments[invoice.id] ?? 0)}?`,
+    };
+    if (confirmations[action] && !window.confirm(confirmations[action]!)) return;
     setWorking(`${invoice.id}:${action}`); setError(""); setNotice("");
     try {
       if (action === "pdf") {
@@ -203,9 +221,19 @@ export default function InvoiceManagementPage() {
       </section>
 
       <section className="mt-7">
-        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-950">Daftar invoice</h2><button onClick={() => void loadInvoices()} className="text-sm font-semibold text-blue-700">Muat ulang</button></div>
-        {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Memuat invoice…</p> : invoices.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Belum ada invoice di organisasi ini.</p> : <div className="grid gap-4">
-          {invoices.map((invoice) => <article key={invoice.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Daftar invoice</h2><p className="text-xs text-slate-500">Kelola dan pantau tagihan organisasi.</p></div><button onClick={() => void loadInvoices()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">Muat ulang</button></div>
+        <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+          <label className="text-xs font-semibold text-slate-600">Cari invoice<input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Nomor invoice, proyek, atau klien…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal"/></label>
+          <label className="text-xs font-semibold text-slate-600">Filter status<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setCursorHistory([]); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua status</option><option value="DRAFT">Draft</option><option value="SENT">Terbit</option><option value="PARTIALLY_PAID">Dibayar sebagian</option><option value="PAID">Lunas</option><option value="OVERDUE">Jatuh tempo</option><option value="VOID">Dibatalkan</option></select></label>
+        </div>
+        {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Memuat invoice…</p> : invoices.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">{statusFilter ? "Tidak ada invoice dengan status ini." : "Belum ada invoice di organisasi ini."}</p> : invoices.filter((invoice) => {
+          const term = searchTerm.trim().toLocaleLowerCase("id-ID");
+          return !term || [invoice.number, invoice.project?.name, invoice.project?.code, invoice.project?.client?.name].some((value) => value?.toLocaleLowerCase("id-ID").includes(term));
+        }).length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Tidak ada hasil yang cocok. Ubah kata kunci pencarian.</p> : <div className="grid gap-4">
+          {invoices.filter((invoice) => {
+            const term = searchTerm.trim().toLocaleLowerCase("id-ID");
+            return !term || [invoice.number, invoice.project?.name, invoice.project?.code, invoice.project?.client?.name].some((value) => value?.toLocaleLowerCase("id-ID").includes(term));
+          }).map((invoice) => <article key={invoice.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{invoice.number}</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{invoice.project?.name ?? invoice.quotation?.number ?? "Invoice layanan"}</h3><p className="mt-1 text-xs text-slate-500">{invoice.project?.client?.name ?? "Klien"} · {new Date(invoice.createdAt).toLocaleDateString("id-ID")}</p></div>
               <StatusBadge status={invoice.status} label={statusLabel[invoice.status] ?? invoice.status} />
