@@ -4,7 +4,7 @@
 Improve daily Finance and Sales interactions without changing database schema, API authorization, tenant boundaries, approved RBAC policy, or credentials.
 
 ## Implemented
-- Added a reusable searchable selector with visible labels and stable ID values.
+- Added a reusable searchable selector with visible labels, stable ID values, and arrow-key / Enter / Escape interaction.
 - Replaced the manual Project ID field in invoice creation with a tenant-authorized project selector.
 - Replaced manual Client ID and optional Project ID fields in quotation creation with searchable selectors.
 - Loads client and project options from the existing organization-scoped API routes; no new data endpoint or authorization bypass was introduced.
