@@ -24,8 +24,8 @@ Improve day-to-day invoice and quotation workflows without changing database sch
 
 ## Validation
 - Static implementation review completed against existing API contracts.
-- CI quality gates are configured to run on this branch.
-- TypeScript, unit tests, migration checks, tenant-integrity checks, and production build must pass in GitHub Actions before this phase is considered CI-verified.
+- GitHub Actions quality gates passed on implementation commit `50e03008d18b740db0eb14b29b14da8b021e082b` (run `43232707740`) and on the latest documentation commit `2f4141801569c41074d551536ffc5aaa4609689e` (run `43232720758`).
+- Frozen install, Prisma Client generation, isolated migration chain, tenant-integrity SQL, TypeScript, unit tests, and production build all passed.
 - Browser visual/responsive and assistive-technology QA remain pending because the Preview environment is SSO-protected and no authenticated browser session is available.
 - Vercel Preview may still be blocked at `db:deploy` by the known branch-scoped `DIRECT_URL` configuration gap. No environment variables were changed.
 
