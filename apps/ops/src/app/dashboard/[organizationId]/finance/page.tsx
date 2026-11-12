@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Prisma, prisma } from "@dzaroza/database";
 import { requireTenantContext } from "@/lib/tenant";
@@ -77,10 +76,8 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ o
     { label: "Pengeluaran", value: money(spent), note: `${expenses._count._all} catatan biaya` },
     { label: "Arus kas bersih", value: money(collected.minus(spent)), note: "Penerimaan dikurangi pengeluaran" },
   ];
-  return <main className="min-h-screen px-5 py-8 md:px-10">
-    <div className="mx-auto max-w-6xl">
-      <Link href={`/dashboard/${organizationId}`} className="text-sm font-semibold text-blue-700">← Kembali ke workspace</Link>
-      <header className="mt-5 flex flex-wrap items-end justify-between gap-4">
+  return <div className="space-y-7">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-700">Dzaroza Property OS · Finance</p><h1 className="mt-2 text-3xl font-bold">Dashboard Keuangan</h1><p className="mt-1 text-sm text-slate-600">{organization.name} · {new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(now)}</p></div>
         <div className="flex flex-wrap gap-2"><Link href={`/dashboard/${organizationId}/quotations`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Penawaran</Link><Link href={`/dashboard/${organizationId}/invoices`} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Manajemen Invoice</Link></div>
       </header>
@@ -109,6 +106,5 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ o
         <h2 className="font-semibold text-slate-900">Basis perhitungan</h2>
         <p className="mt-2">Penerimaan dihitung dari pembayaran invoice berstatus SETTLEMENT, bukan sekadar invoice yang diterbitkan. Pengeluaran mengikuti tanggal biaya dicatat. Pembayaran langganan platform tidak masuk ke arus kas operasional organisasi.</p>
       </section>
-    </div>
-  </main>;
+  </div>;
 }

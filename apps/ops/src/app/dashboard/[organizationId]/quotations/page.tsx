@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
@@ -106,10 +105,8 @@ export default function QuotationManagementPage() {
     catch { setError("Clipboard tidak tersedia. Salin link yang tampil secara manual."); }
   }
 
-  return <main className="min-h-screen bg-slate-50 px-5 py-8 md:px-10">
-    <div className="mx-auto max-w-6xl">
-      <Link href={`/dashboard/${organizationId}`} className="text-sm font-semibold text-blue-700">← Kembali ke workspace</Link>
-      <header className="mt-5 flex flex-wrap items-end justify-between gap-4">
+  return <div className="space-y-7">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-700">Dzaroza Property OS · Sales</p><h1 className="mt-2 text-3xl font-bold text-slate-950">Manajemen Penawaran</h1><p className="mt-1 text-sm text-slate-600">Buat penawaran, kirim persetujuan klien dan konversikan penawaran menjadi proyek.</p></div>
         <Link href={`/dashboard/${organizationId}/invoices`} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Manajemen Invoice</Link>
       </header>
@@ -169,6 +166,5 @@ export default function QuotationManagementPage() {
           </article>)}
         </div>}
       </section>
-    </div>
-  </main>;
+  </div>;
 }
