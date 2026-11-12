@@ -244,6 +244,7 @@ export default function QuotationManagementPage() {
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{quotation.items.length} item</p><p className="text-xl font-bold tabular-nums">{money(quotation.total)}</p></div>
             <div className="mt-4 flex flex-wrap gap-2">
+              <Link href={`/dashboard/${organizationId}/quotations/${quotation.id}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">Lihat detail & riwayat</Link>
               {quotation.status === "DRAFT" && <button disabled={working === `${quotation.id}:send`} onClick={() => void quotationAction(quotation, "send")} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Terbitkan</button>}
               {quotation.status === "SENT" && <button disabled={working === `${quotation.id}:approval`} onClick={() => void quotationAction(quotation, "approval")} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 disabled:opacity-50">Kirim persetujuan klien</button>}
               {["ACCEPTED", "CONVERTED"].includes(quotation.status) && <button disabled={working === `${quotation.id}:invoice`} onClick={() => void quotationAction(quotation, "invoice")} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Buat invoice</button>}
