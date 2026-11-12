@@ -175,7 +175,7 @@ export default function QuotationManagementPage() {
             options={projects.filter((project) => {
               const match = project.description;
               const selectedClient = clients.find((client) => client.value === clientId);
-              return !clientId || !selectedClient || match === selectedClient.label || true;
+              return !clientId || !selectedClient || match === selectedClient.label;
             })}
             onChange={setProjectId}
             disabled={referenceDataLoading || !clientId || working === "create"}
