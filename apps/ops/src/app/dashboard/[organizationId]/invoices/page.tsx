@@ -244,6 +244,7 @@ export default function InvoiceManagementPage() {
               <div><p className="text-xs text-slate-500">Sisa tagihan</p><p className="mt-1 font-semibold tabular-nums">{money(Number(invoice.total) - Number(invoice.paidAmount))}</p></div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
+              <Link href={`/dashboard/${organizationId}/invoices/${invoice.id}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">Lihat detail & riwayat</Link>
               {invoice.status === "DRAFT" && <button disabled={working === `${invoice.id}:issue`} onClick={() => void runInvoiceAction(invoice, "issue")} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Terbitkan</button>}
               {["SENT", "PARTIALLY_PAID", "OVERDUE", "PAID"].includes(invoice.status) && <button disabled={working === `${invoice.id}:send`} onClick={() => void runInvoiceAction(invoice, "send")} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Kirim email PDF</button>}
               <button disabled={working === `${invoice.id}:pdf`} onClick={() => void runInvoiceAction(invoice, "pdf")} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Unduh PDF</button>
