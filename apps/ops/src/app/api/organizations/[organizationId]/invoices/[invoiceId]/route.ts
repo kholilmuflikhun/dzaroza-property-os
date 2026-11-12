@@ -19,7 +19,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
       include: {
         items: { orderBy: { sortOrder: "asc" } },
         project: { include: { client: { select: { id: true, name: true, email: true, phone: true } } } },
-        quotation: { select: { id: true, number: true, status: true } },
+        quotation: { select: { id: true, number: true, status: true, client: { select: { name: true, email: true, phone: true } } } },
         payments: { where: { status: "SETTLEMENT" }, orderBy: { paidAt: "desc" } },
       },
     });
