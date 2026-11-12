@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
+import { StatusBadge } from "@/components/status-badge";
 
 type Quotation = {
   id: string;
@@ -23,6 +25,9 @@ export default function QuotationManagementPage() {
   const organizationId = params.organizationId;
   const endpoint = `/api/organizations/${encodeURIComponent(organizationId)}/quotations`;
   const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [clients, setClients] = useState<SearchableOption[]>([]);
+  const [projects, setProjects] = useState<SearchableOption[]>([]);
+  const [referenceDataLoading, setReferenceDataLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -48,6 +53,40 @@ export default function QuotationManagementPage() {
     } finally { setLoading(false); }
   }, [endpoint]);
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadReferenceData() {
+      setReferenceDataLoading(true);
+      try {
+        const [clientResponse, projectResponse] = await Promise.all([
+          fetch(`/api/organizations/${encodeURIComponent(organizationId)}/clients`, { cache: "no-store" }),
+          fetch(`/api/organizations/${encodeURIComponent(organizationId)}/projects`, { cache: "no-store" }),
+        ]);
+        const [clientPayload, projectPayload] = await Promise.all([clientResponse.json(), projectResponse.json()]);
+        if (!clientResponse.ok) throw new Error(clientPayload.error ?? "Daftar klien tidak dapat dimuat.");
+        if (!projectResponse.ok) throw new Error(projectPayload.error ?? "Daftar proyek tidak dapat dimuat.");
+        if (active) {
+          setClients((clientPayload.clients ?? []).map((client: { id: string; name: string; email?: string | null; phone?: string | null }) => ({
+            value: client.id,
+            label: client.name,
+            description: client.email ?? client.phone ?? "Klien organisasi",
+          })));
+          setProjects((projectPayload.projects ?? []).map((project: { id: string; code: string; name: string; client?: { name?: string } }) => ({
+            value: project.id,
+            label: project.code + " · " + project.name,
+            description: project.client?.name ?? "Tanpa nama klien",
+          })));
+        }
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : "Data klien dan proyek tidak dapat dimuat.");
+      } finally {
+        if (active) setReferenceDataLoading(false);
+      }
+    }
+    void loadReferenceData();
+    return () => { active = false; };
+  }, [organizationId]);
 
   async function createQuotation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setWorking("create"); setError(""); setNotice("");
@@ -117,14 +156,33 @@ export default function QuotationManagementPage() {
 
       <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-semibold text-slate-950">Buat quotation</h2>
-        <p className="mt-1 text-sm text-slate-500">Total dihitung di server. Masukkan Client ID dan Project ID bila penawaran terkait proyek yang sudah ada.</p>
+        <p className="mt-1 text-sm text-slate-500">Total dihitung di server. Pilih klien, lalu hubungkan proyek bila penawaran terkait proyek yang sudah ada.</p>
         <form onSubmit={createQuotation} className="mt-5 grid gap-3 md:grid-cols-2">
-          <label className="text-sm font-medium text-slate-700">Client ID
-            <input required value={clientId} onChange={(event) => setClientId(event.target.value)} placeholder="ID klien" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
-          </label>
-          <label className="text-sm font-medium text-slate-700">Project ID (opsional)
-            <input value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="ID proyek" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
-          </label>
+          <SearchableSelect
+            id="quotation-client"
+            label="Klien"
+            value={clientId}
+            options={clients}
+            onChange={(next) => { setClientId(next); setProjectId(""); }}
+            required
+            disabled={referenceDataLoading || working === "create"}
+            placeholder={referenceDataLoading ? "Memuat klien…" : "Cari nama atau kontak klien"}
+            emptyMessage="Klien tidak ditemukan atau tidak tersedia untuk akses Anda."
+          />
+          <SearchableSelect
+            id="quotation-project"
+            label="Proyek (opsional)"
+            value={projectId}
+            options={projects.filter((project) => {
+              const match = project.description;
+              const selectedClient = clients.find((client) => client.value === clientId);
+              return !clientId || !selectedClient || match === selectedClient.label;
+            })}
+            onChange={setProjectId}
+            disabled={referenceDataLoading || !clientId || working === "create"}
+            placeholder={!clientId ? "Pilih klien terlebih dahulu" : "Cari kode atau nama proyek"}
+            emptyMessage="Proyek tidak ditemukan."
+          />
           <label className="text-sm font-medium text-slate-700">Deskripsi layanan
             <input required minLength={2} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Contoh: Jasa manajemen properti" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
           </label>
@@ -144,7 +202,7 @@ export default function QuotationManagementPage() {
               <input type="number" min="0" step="0.01" value={tax} onChange={(event) => setTax(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"/>
             </label>
           </div>
-          <div className="md:col-span-2"><button disabled={working === "create"} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{working === "create" ? "Membuat…" : "Buat Draft Quotation"}</button></div>
+          <div className="md:col-span-2"><button disabled={working === "create" || !clientId || referenceDataLoading} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{working === "create" ? "Membuat…" : "Buat Draft Quotation"}</button></div>
         </form>
       </section>
 
@@ -154,7 +212,7 @@ export default function QuotationManagementPage() {
           {quotations.map((quotation) => <article key={quotation.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{quotation.number}</p><h3 className="mt-1 text-lg font-semibold text-slate-950">{quotation.client.name}</h3><p className="mt-1 text-xs text-slate-500">{quotation.project ? `${quotation.project.code} · ${quotation.project.name}` : "Belum terhubung ke proyek"} · {new Date(quotation.createdAt).toLocaleDateString("id-ID")}</p></div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{labels[quotation.status] ?? quotation.status}</span>
+              <StatusBadge status={quotation.status} label={labels[quotation.status] ?? quotation.status} />
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{quotation.items.length} item</p><p className="text-xl font-bold tabular-nums">{money(quotation.total)}</p></div>
             <div className="mt-4 flex flex-wrap gap-2">
