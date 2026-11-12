@@ -1,7 +1,7 @@
 name: Phase 0.6 OS Security & Release Readiness
 on:
   push:
-    branches: [feat/phase-0-source-preservation, feat/phase-0.8-ui-ux-enhancement]
+    branches: [feat/phase-0-source-preservation, feat/phase-0.8-ui-ux-enhancement, feat/phase-0.9-operational-ux]
   pull_request:
     branches: [main]
   workflow_dispatch:
