@@ -76,7 +76,6 @@ export function SearchableSelect({
           ))}
         </div>
       )}
-      {required && <input tabIndex={-1} aria-hidden="true" required value={value} onChange={() => undefined} className="pointer-events-none absolute h-px w-px opacity-0" />}
     </div>
   );
 }
