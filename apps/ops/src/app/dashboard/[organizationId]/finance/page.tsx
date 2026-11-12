@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Prisma, prisma } from "@dzaroza/database";
 import { requireTenantContext } from "@/lib/tenant";
