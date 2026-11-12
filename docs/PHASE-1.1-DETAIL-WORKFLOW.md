@@ -23,8 +23,8 @@ Provide a useful detail workspace for invoices and quotations, with a tenant-sco
 
 ## Validation
 - Existing detail APIs reviewed and reused.
-- CI quality gates are configured for the Phase 1.1 branch.
-- TypeScript, unit tests, migration checks, tenant-integrity checks, and production build must pass before this phase is considered CI-verified.
+- GitHub Actions quality gates passed on implementation commit `b60f29529228f9203859e7e78f65efc50600ef0c` (run `43243704005`) and documentation commit `fcc5b08f2aeb4103a2bc4ccd7bb235616f9debf5` (run `43243745074`).
+- Frozen install, Prisma Client generation, isolated migration chain, tenant-integrity SQL, TypeScript, unit tests, and production build all passed.
 - Browser visual/responsive and assistive-technology QA remain pending due to the existing Preview SSO limitation.
 - Vercel Preview may remain blocked at `db:deploy` by branch-scoped missing `DIRECT_URL`; no environment settings were changed.
 
