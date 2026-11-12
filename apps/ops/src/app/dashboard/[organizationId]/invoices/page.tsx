@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
 
 type Invoice = {
   id: string;
@@ -29,6 +30,8 @@ export default function InvoiceManagementPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [projects, setProjects] = useState<SearchableOption[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -57,6 +60,29 @@ export default function InvoiceManagementPage() {
   }, [endpoint]);
 
   useEffect(() => { void loadInvoices(); }, [loadInvoices]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadProjects() {
+      setProjectsLoading(true);
+      try {
+        const response = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/projects`, { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Daftar proyek tidak dapat dimuat.");
+        if (active) setProjects((payload.projects ?? []).map((project: { id: string; code: string; name: string; client?: { name?: string } }) => ({
+          value: project.id,
+          label: project.code + " · " + project.name,
+          description: project.client?.name ?? "Tanpa nama klien",
+        })));
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : "Daftar proyek tidak dapat dimuat.");
+      } finally {
+        if (active) setProjectsLoading(false);
+      }
+    }
+    void loadProjects();
+    return () => { active = false; };
+  }, [organizationId]);
 
   async function createInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,9 +177,17 @@ export default function InvoiceManagementPage() {
         <h2 className="font-semibold text-slate-950">Buat invoice manual</h2>
         <p className="mt-1 text-sm text-slate-500">Invoice dibuat sebagai Draft. Gunakan ID proyek yang sudah terdaftar di organisasi ini.</p>
         <form onSubmit={createInvoice} className="mt-5 grid gap-3 md:grid-cols-2">
-          <label className="text-sm font-medium text-slate-700">Project ID
-            <input required value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="ID proyek" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
-          </label>
+          <SearchableSelect
+            id="invoice-project"
+            label="Proyek"
+            value={projectId}
+            options={projects}
+            onChange={setProjectId}
+            required
+            disabled={projectsLoading || working === "create"}
+            placeholder={projectsLoading ? "Memuat proyek…" : "Cari kode atau nama proyek"}
+            emptyMessage="Proyek tidak ditemukan atau tidak tersedia untuk akses Anda."
+          />
           <label className="text-sm font-medium text-slate-700">Deskripsi layanan
             <input required minLength={2} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Contoh: Jasa manajemen properti" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
           </label>
@@ -163,7 +197,7 @@ export default function InvoiceManagementPage() {
           <label className="text-sm font-medium text-slate-700">Harga satuan (IDR)
             <input required type="number" min="0.01" step="0.01" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} placeholder="1500000" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500"/>
           </label>
-          <div className="md:col-span-2"><button disabled={working === "create"} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{working === "create" ? "Membuat…" : "Buat Draft Invoice"}</button></div>
+          <div className="md:col-span-2"><button disabled={working === "create" || !projectId || projectsLoading} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{working === "create" ? "Membuat…" : "Buat Draft Invoice"}</button></div>
         </form>
       </section>
 
